@@ -1,0 +1,9 @@
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Reports',
+};
+
+export default function ReportsPage() {
+  return <div>ReportsPage</div>;
+}
