@@ -14,8 +14,14 @@ export async function apiFetch<T>(
   const { body, headers, token, ...init } = options;
 
   const newHeaders = new Headers(headers);
-  if (token) {
-    newHeaders.set('Authorization', `Bearer ${token}`);
+  let activeToken = token;
+  if (!activeToken && typeof window !== 'undefined') {
+    const Cookies = require('js-cookie');
+    activeToken = Cookies.get('auth_token');
+  }
+  
+  if (activeToken) {
+    newHeaders.set('Authorization', `Bearer ${activeToken}`);
   }
 
   if (body !== undefined && !(body instanceof FormData)) {

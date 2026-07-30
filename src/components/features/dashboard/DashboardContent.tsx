@@ -2,6 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/providers/AuthContext';
+import { PortfolioApi } from '@/lib/api/portfolio.api';
+import { InvestmentApi } from '@/lib/api/investment.api';
+import { GoalApi } from '@/lib/api/goal.api';
+import { formatCurrency } from '@/lib/mock-data';
 import {
   TrendingUp,
   TrendingDown,
@@ -16,7 +22,64 @@ import {
 } from 'lucide-react';
 
 export default function DashboardContent() {
-  
+  const { user } = useAuth();
+
+  // Fetch portfolios
+  const { data: portfolios = [] } = useQuery({
+    queryKey: ['portfolios'],
+    queryFn: () => PortfolioApi.findAll(),
+    retry: false,
+  });
+
+  // Fetch investments
+  const { data: investments = [] } = useQuery({
+    queryKey: ['investments'],
+    queryFn: () => InvestmentApi.findAll(),
+    retry: false,
+  });
+
+  // Fetch goals
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals'],
+    queryFn: () => GoalApi.findAll(),
+    retry: false,
+  });
+
+  const hasData = portfolios.length > 0 || investments.length > 0 || goals.length > 0;
+
+  // Fallback defaults matching mockups
+  const dTotalValue = hasData
+    ? investments.reduce((sum, inv) => sum + (inv.currentPrice * inv.quantity), 0)
+    : 1465000;
+
+  const dTotalInvested = hasData
+    ? investments.reduce((sum, inv) => sum + (inv.buyPrice * inv.quantity), 0)
+    : 1330000;
+
+  const dProfit = hasData
+    ? dTotalValue - dTotalInvested
+    : 135000;
+
+  const dRoi = hasData
+    ? (dTotalInvested > 0 ? (dProfit / dTotalInvested) * 100 : 0)
+    : 10.15;
+
+  const dLoss = hasData
+    ? investments.filter(inv => inv.currentPrice < inv.buyPrice).reduce((sum, inv) => sum + (inv.buyPrice - inv.currentPrice) * inv.quantity, 0)
+    : 55000;
+
+  const dAssetsCount = hasData ? investments.length : 17;
+  const dPortfoliosCount = hasData ? portfolios.length : 3;
+  const dGoalsCount = hasData ? goals.length : 3;
+
+  const userInitials = user
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : 'SJ';
+
+  const userFullName = user
+    ? `${user.firstName} ${user.lastName}`
+    : 'สมชาย ใจดี';
+
   // Data for Asset Allocation Donut Chart
   const assetAllocation = [
     { name: 'หุ้นไทย/ต่างประเทศ', value: 55, color: '#10b981' }, // emerald-500
@@ -40,12 +103,12 @@ export default function DashboardContent() {
           {/* Left: User Welcome info */}
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
             <div className="size-16 rounded-full border-2 border-white/20 bg-white/15 backdrop-blur-sm grid place-items-center text-2xl font-bold font-sans">
-              SJ
+              {userInitials}
             </div>
             <div>
               <div className="flex items-center justify-center sm:justify-start gap-2">
                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                  ยินดีต้อนรับกลับ สมชาย ใจดี
+                  ยินดีต้อนรับกลับ {userFullName}
                 </h1>
                 <span className="text-2xl animate-bounce origin-bottom">👋</span>
               </div>
@@ -143,7 +206,7 @@ export default function DashboardContent() {
         {[
           {
             title: 'มูลค่าพอร์ตรวม',
-            value: '฿1,465,000',
+            value: formatCurrency(dTotalValue),
             change: '+8.2%',
             isPositive: true,
             bgIcon: 'bg-emerald-500/10 text-emerald-500',
@@ -151,7 +214,7 @@ export default function DashboardContent() {
           },
           {
             title: 'เงินลงทุนทั้งหมด',
-            value: '฿1,330,000',
+            value: formatCurrency(dTotalInvested),
             change: '+5.1%',
             isPositive: true,
             bgIcon: 'bg-blue-500/10 text-blue-500',
@@ -159,23 +222,23 @@ export default function DashboardContent() {
           },
           {
             title: 'กำไรสุทธิ',
-            value: '฿135,000',
+            value: formatCurrency(dProfit),
             change: '+10.2%',
-            isPositive: true,
+            isPositive: dProfit >= 0,
             bgIcon: 'bg-violet-500/10 text-violet-500',
             icon: <Sparkles className="size-4" />,
           },
           {
             title: 'ROI รวม',
-            value: '+10.15%',
+            value: `${dRoi >= 0 ? '+' : ''}${dRoi.toFixed(2)}%`,
             change: '+1.2%',
-            isPositive: true,
+            isPositive: dRoi >= 0,
             bgIcon: 'bg-amber-500/10 text-amber-500',
             icon: <TrendingUp className="size-4" />,
           },
           {
             title: 'ขาดทุน (ยังไม่ realise)',
-            value: '฿55,000',
+            value: formatCurrency(dLoss),
             change: '-4.1%',
             isPositive: false,
             bgIcon: 'bg-rose-500/10 text-rose-500',
@@ -183,7 +246,7 @@ export default function DashboardContent() {
           },
           {
             title: 'จำนวนรายการสินทรัพย์',
-            value: '17 รายการ',
+            value: `${dAssetsCount} รายการ`,
             change: 'หุ้น, กองทุน, คริปโต',
             isPositive: null,
             bgIcon: 'bg-sky-500/10 text-sky-500',
@@ -191,7 +254,7 @@ export default function DashboardContent() {
           },
           {
             title: 'จำนวน Portfolio',
-            value: '3 พอร์ต',
+            value: `${dPortfoliosCount} พอร์ต`,
             change: 'เติบโต, เกษียณ, ซื้อบ้าน',
             isPositive: null,
             bgIcon: 'bg-indigo-500/10 text-indigo-500',
@@ -199,8 +262,8 @@ export default function DashboardContent() {
           },
           {
             title: 'เป้าหมายทั้งหมด',
-            value: '3 เป้าหมาย',
-            change: 'สำเร็จแล้ว 1 เป้าหมาย',
+            value: `${dGoalsCount} เป้าหมาย`,
+            change: hasData ? 'ข้อมูลเป้าหมายของคุณ' : 'สำเร็จแล้ว 1 เป้าหมาย',
             isPositive: null,
             bgIcon: 'bg-teal-500/10 text-teal-500',
             icon: <Target className="size-4" />,

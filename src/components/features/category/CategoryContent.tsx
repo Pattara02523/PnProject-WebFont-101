@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target } from 'lucide-react';
 import { Card, Button, Badge, Modal, EmptyState, ConfirmDialog } from '@/components/ui/index';
+import { useQuery } from '@tanstack/react-query';
+import { CategoryApi } from '@/lib/api/category.api';
 import { mockCategories } from '@/lib/mock-data';
 
 const iconOptions = ['Tag', 'Zap', 'Building2', 'Cpu', 'Home', 'TrendingUp', 'Star', 'Globe', 'Shield', 'Target'];
@@ -13,22 +15,52 @@ const IconMap: Record<string, any> = { Tag, Zap, Building2, Cpu, Home, TrendingU
 interface Category { id: string; name: string; icon: string; color: string; count: number }
 
 export default function CategoryContent() {
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  // Load categories from REST API using React Query
+  const { data: apiCategories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => CategoryApi.findAll(),
+    retry: false,
+  });
+
+  const [localCategories, setLocalCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', icon: 'Tag', color: '#10b981' });
 
+  const categories = useMemo(() => {
+    if (apiCategories && apiCategories.length > 0) {
+      return apiCategories;
+    }
+    return localCategories.length > 0 ? localCategories : mockCategories;
+  }, [apiCategories, localCategories]);
+
   const openCreate = () => { setForm({ name: '', icon: 'Tag', color: '#10b981' }); setEditItem(null); setShowForm(true); };
   const openEdit = (c: Category) => { setForm({ name: c.name, icon: c.icon, color: c.color }); setEditItem(c); setShowForm(true); };
 
   const handleSave = () => {
+    // Categories are managed locally as fallback
     if (editItem) {
-      setCategories(cs => cs.map(c => c.id === editItem.id ? { ...c, ...form } : c));
+      setLocalCategories(cs => {
+        const current = cs.length > 0 ? cs : [...mockCategories];
+        return current.map(c => c.id === editItem.id ? { ...c, ...form } : c);
+      });
     } else {
-      setCategories(cs => [...cs, { id: Date.now().toString(), ...form, count: 0 }]);
+      setLocalCategories(cs => {
+        const current = cs.length > 0 ? cs : [...mockCategories];
+        return [...current, { id: Date.now().toString(), ...form, count: 0 }];
+      });
     }
     setShowForm(false);
+  };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    setLocalCategories(cs => {
+      const current = cs.length > 0 ? cs : [...mockCategories];
+      return current.filter(c => c.id !== deleteId);
+    });
+    setDeleteId(null);
   };
 
   return (
@@ -102,7 +134,7 @@ export default function CategoryContent() {
         </div>
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => { setCategories(cs => cs.filter(c => c.id !== deleteId)); setDeleteId(null); }} title="ลบหมวดหมู่?" description="ข้อมูลในหมวดหมู่นี้จะยังคงอยู่ แต่จะถูกย้ายไปยัง 'ไม่มีหมวดหมู่'" danger />
+      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="ลบหมวดหมู่?" description="ข้อมูลในหมวดหมู่นี้จะยังคงอยู่ แต่จะถูกย้ายไปยัง 'ไม่มีหมวดหมู่'" danger />
     </>
   );
 }

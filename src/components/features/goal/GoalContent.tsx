@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Home, Car, Target, Palmtree } from 'lucide-react';
 import { Card, Button, Modal, EmptyState, ConfirmDialog, Progress } from '@/components/ui/index';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { GoalApi } from '@/lib/api/goal.api';
 import { mockGoals, formatCurrency } from '@/lib/mock-data';
 
 const iconMap: Record<string, any> = { Home, Car, Target, Palmtree };
@@ -11,23 +13,81 @@ const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'
 interface Goal { id: string; name: string; icon: string; targetAmount: number; currentAmount: number; deadline: string; color: string; description: string }
 
 export default function GoalContent() {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const queryClient = useQueryClient();
+  
+  // Load goals from REST API using React Query
+  const { data: apiGoals = [] } = useQuery({
+    queryKey: ['goals'],
+    queryFn: () => GoalApi.findAll(),
+    retry: false,
+  });
+
+  const [localGoals, setLocalGoals] = useState<Goal[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Goal | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', targetAmount: '', currentAmount: '', deadline: '', color: '#10b981', icon: 'Target' });
 
+  const goals = useMemo(() => {
+    if (apiGoals && apiGoals.length > 0) {
+      return apiGoals;
+    }
+    return localGoals.length > 0 ? localGoals : mockGoals;
+  }, [apiGoals, localGoals]);
+
   const openCreate = () => { setForm({ name: '', description: '', targetAmount: '', currentAmount: '', deadline: '', color: '#10b981', icon: 'Target' }); setEditItem(null); setShowForm(true); };
   const openEdit = (g: Goal) => { setForm({ ...g, targetAmount: String(g.targetAmount), currentAmount: String(g.currentAmount) }); setEditItem(g); setShowForm(true); };
 
-  const handleSave = () => {
-    const data = { ...form, targetAmount: parseFloat(form.targetAmount) || 0, currentAmount: parseFloat(form.currentAmount) || 0 };
+  const handleSave = async () => {
+    const data = {
+      name: form.name,
+      description: form.description,
+      targetAmount: parseFloat(form.targetAmount) || 0,
+      currentAmount: parseFloat(form.currentAmount) || 0,
+      deadline: form.deadline,
+      color: form.color,
+      icon: form.icon
+    };
+
     if (editItem) {
-      setGoals(gs => gs.map(g => g.id === editItem.id ? { ...g, ...data } : g));
+      try {
+        await GoalApi.update(editItem.id, data);
+        queryClient.invalidateQueries({ queryKey: ['goals'] });
+      } catch (err) {
+        console.warn('API update failed, updating local state fallback:', err);
+        setLocalGoals(gs => {
+          const current = gs.length > 0 ? gs : [...mockGoals];
+          return current.map(g => g.id === editItem.id ? { ...g, ...data } : g);
+        });
+      }
     } else {
-      setGoals(gs => [...gs, { id: Date.now().toString(), ...data }]);
+      try {
+        await GoalApi.create(data);
+        queryClient.invalidateQueries({ queryKey: ['goals'] });
+      } catch (err) {
+        console.warn('API create failed, updating local state fallback:', err);
+        setLocalGoals(gs => {
+          const current = gs.length > 0 ? gs : [...mockGoals];
+          return [...current, { id: Date.now().toString(), ...data }];
+        });
+      }
     }
     setShowForm(false);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await GoalApi.delete(deleteId);
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    } catch (err) {
+      console.warn('API delete failed, updating local state fallback:', err);
+      setLocalGoals(gs => {
+        const current = gs.length > 0 ? gs : [...mockGoals];
+        return current.filter(g => g.id !== deleteId);
+      });
+    }
+    setDeleteId(null);
   };
 
   const daysLeft = (deadline: string) => {
@@ -145,7 +205,7 @@ export default function GoalContent() {
         </div>
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => { setGoals(gs => gs.filter(g => g.id !== deleteId)); setDeleteId(null); }} title="ลบเป้าหมาย?" danger />
+      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="ลบเป้าหมาย?" danger />
     </>
   );
 }

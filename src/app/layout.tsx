@@ -3,6 +3,8 @@ import '@/styles/globals.css';
 import { cn } from '@/lib/utils';
 import { notoSans } from '@/styles/font';
 import { Metadata } from 'next';
+import { QueryProvider } from '@/components/providers/QueryProvider';
+import { AuthProvider } from '@/components/providers/AuthContext';
 
 export const metadata: Metadata = {
   title: {
@@ -38,7 +40,13 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </QueryProvider>
+      </body>
     </html>
   );
 }

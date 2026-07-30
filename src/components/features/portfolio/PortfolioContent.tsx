@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Grid, List, ChevronDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import PortfolioCard, { PortfolioItem } from './PortfolioCard';
 import { PortfolioApi } from '@/lib/api/portfolio.api';
 
@@ -48,52 +49,46 @@ const MOCK_PORTFOLIOS: PortfolioItem[] = [
 
 export default function PortfolioContent() {
   const router = useRouter();
-  const [portfolios, setPortfolios] = useState<PortfolioItem[]>(MOCK_PORTFOLIOS);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'date'>('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Try to load portfolios from the NestJS REST API on mount
-  useEffect(() => {
-    async function fetchPortfolios() {
-      try {
-        const response = await PortfolioApi.findAll();
-        if (response && response.length > 0) {
-          // Map backend portfolios to UI structure
-          const mapped: PortfolioItem[] = response.map((item, index) => {
-            // Pick a color theme cycle: orange, blue, green
-            const colorThemes = ['orange', 'blue', 'green'];
-            const color = item.color || colorThemes[index % colorThemes.length];
-            
-            // Generate some mock values for display if API doesn't provide them
-            const mockValues = [
-              { value: 195000, change: '55,000', percent: '-22.00%', isPos: false },
-              { value: 420000, change: '40,000', percent: '+10.53%', isPos: true },
-              { value: 850000, change: '150,000', percent: '+21.43%', isPos: true },
-            ];
-            const currentMock = mockValues[index % mockValues.length];
+  // Load portfolios from NestJS REST API using React Query
+  const { data: apiPortfolios = [] } = useQuery({
+    queryKey: ['portfolios'],
+    queryFn: () => PortfolioApi.findAll(),
+    retry: false,
+  });
 
-            return {
-              id: item.id,
-              name: item.name,
-              description: item.description || 'คำอธิบายพอร์ตโฟลิโอ',
-              value: currentMock.value,
-              change: currentMock.change,
-              changePercent: currentMock.percent,
-              isPositive: currentMock.isPos,
-              assetsCount: item._count?.investments || 0,
-              createdAt: new Date(item.createdAt).toISOString().split('T')[0],
-              color: color,
-            };
-          });
-          setPortfolios(mapped);
-        }
-      } catch (error) {
-        console.warn('API is down or unauthorized. Using mock portfolio data.', error);
-      }
+  const portfolios = useMemo(() => {
+    if (apiPortfolios && apiPortfolios.length > 0) {
+      return apiPortfolios.map((item, index) => {
+        const colorThemes = ['orange', 'blue', 'green'];
+        const color = item.color || colorThemes[index % colorThemes.length];
+        
+        const mockValues = [
+          { value: 195000, change: '55,000', percent: '-22.00%', isPos: false },
+          { value: 420000, change: '40,000', percent: '+10.53%', isPos: true },
+          { value: 850000, change: '150,000', percent: '+21.43%', isPos: true },
+        ];
+        const currentMock = mockValues[index % mockValues.length];
+
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description || 'คำอธิบายพอร์ตโฟลิโอ',
+          value: currentMock.value,
+          change: currentMock.change,
+          changePercent: currentMock.percent,
+          isPositive: currentMock.isPos,
+          assetsCount: item._count?.investments || 0,
+          createdAt: new Date(item.createdAt).toISOString().split('T')[0],
+          color: color,
+        };
+      });
     }
-    fetchPortfolios();
-  }, []);
+    return MOCK_PORTFOLIOS;
+  }, [apiPortfolios]);
 
   // Filter and Sort portfolios
   const getFilteredPortfolios = () => {

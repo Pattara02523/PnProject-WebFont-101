@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from 'react'
-import { Plus, Search, Filter, ArrowUpRight, ArrowDownRight, DollarSign, PiggyBank, CreditCard } from 'lucide-react'
-import { Card, Button, Badge, Modal, EmptyState, Pagination } from '@/components/ui'
-import { mockTransactions, formatCurrency } from '@/lib/mock-data'
+import React, { useState, useMemo } from 'react';
+import { Plus, Search, Filter, ArrowUpRight, ArrowDownRight, DollarSign, PiggyBank, CreditCard } from 'lucide-react';
+import { Card, Button, Badge, Modal, EmptyState, Pagination } from '@/components/ui';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { TransactionApi, Transaction } from '@/lib/api/transaction.api';
+import { mockTransactions, formatCurrency } from '@/lib/mock-data';
 
 const txTypes = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -23,27 +25,68 @@ const typeConfig: Record<string, { label: string; color: string; bg: string; var
 }
 
 export default function TransactionContent() {
-  const [transactions, setTransactions] = useState(mockTransactions)
-  const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState('all')
-  const [page, setPage] = useState(1)
-  const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ type: 'buy', asset: '', symbol: '', amount: '', quantity: '', price: '', date: '', note: '' })
+  const queryClient = useQueryClient();
 
-  const filtered = transactions.filter(t => {
-    const matchSearch = t.asset.toLowerCase().includes(search.toLowerCase()) || t.symbol.toLowerCase().includes(search.toLowerCase())
-    const matchType = filterType === 'all' || t.type === filterType
-    return matchSearch && matchType
-  })
+  // Load transactions from REST API using React Query
+  const { data: apiTransactions = [] } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: () => TransactionApi.findAll(),
+    retry: false,
+  });
 
-  const perPage = 10
-  const paged = filtered.slice((page - 1) * perPage, page * perPage)
+  const [localTransactions, setLocalTransactions] = useState<Transaction[]>([]);
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [page, setPage] = useState(1);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ type: 'buy', asset: '', symbol: '', amount: '', quantity: '', price: '', date: '', note: '' });
 
-  const handleAdd = () => {
-    setTransactions(ts => [...ts, { id: Date.now().toString(), portfolioId: '1', ...form, amount: parseFloat(form.amount), quantity: parseFloat(form.quantity), price: parseFloat(form.price) }])
-    setShowAdd(false)
-    setForm({ type: 'buy', asset: '', symbol: '', amount: '', quantity: '', price: '', date: '', note: '' })
-  }
+  const transactions = useMemo(() => {
+    if (apiTransactions && apiTransactions.length > 0) {
+      return apiTransactions;
+    }
+    return localTransactions.length > 0 ? localTransactions : mockTransactions;
+  }, [apiTransactions, localTransactions]);
+
+  const filtered = useMemo(() => {
+    return transactions.filter(t => {
+      const matchSearch = t.asset.toLowerCase().includes(search.toLowerCase()) || t.symbol.toLowerCase().includes(search.toLowerCase());
+      const matchType = filterType === 'all' || t.type === filterType;
+      return matchSearch && matchType;
+    });
+  }, [transactions, search, filterType]);
+
+  const perPage = 10;
+  const paged = useMemo(() => {
+    return filtered.slice((page - 1) * perPage, page * perPage);
+  }, [filtered, page]);
+
+  const handleAdd = async () => {
+    const data = {
+      type: form.type as any,
+      asset: form.asset,
+      symbol: form.symbol,
+      amount: parseFloat(form.amount) || 0,
+      quantity: parseFloat(form.quantity) || 0,
+      price: parseFloat(form.price) || 0,
+      date: form.date,
+      note: form.note,
+      portfolioId: '1',
+    };
+
+    try {
+      await TransactionApi.create(data);
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    } catch (err) {
+      console.warn('API create transaction failed, fallback to local state:', err);
+      setLocalTransactions(ts => {
+        const current = ts.length > 0 ? ts : [...mockTransactions];
+        return [...current, { id: Date.now().toString(), ...data }];
+      });
+    }
+    setShowAdd(false);
+    setForm({ type: 'buy', asset: '', symbol: '', amount: '', quantity: '', price: '', date: '', note: '' });
+  };
 
   const totalIn = transactions.filter(t => ['sell', 'dividend', 'deposit'].includes(t.type)).reduce((s, t) => s + t.amount, 0)
   const totalOut = transactions.filter(t => ['buy', 'withdraw'].includes(t.type)).reduce((s, t) => s + t.amount, 0)

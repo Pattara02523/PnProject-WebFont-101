@@ -1,8 +1,7 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, Bell, Sun, Moon } from 'lucide-react';
+import { Search, Bell } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 const PATH_TITLE_MAP: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -19,25 +18,6 @@ const PATH_TITLE_MAP: Record<string, string> = {
 
 export default function Header() {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-
-  // Sync theme status on mount
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setTheme(isDark ? 'dark' : 'light');
-  }, []);
-
-  const toggleTheme = () => {
-    if (theme === 'dark') {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setTheme('light');
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setTheme('dark');
-    }
-  };
 
   // Find matching title based on path
   const getPageTitle = () => {
@@ -82,17 +62,7 @@ export default function Header() {
         </button>
 
         {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-95 group"
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? (
-            <Sun className="size-4.5 text-amber-500 transition-transform duration-500 group-hover:rotate-45" />
-          ) : (
-            <Moon className="size-4.5 text-indigo-400 transition-transform duration-500 group-hover:-rotate-12" />
-          )}
-        </button>
+        <ThemeToggle />
 
       </div>
 
