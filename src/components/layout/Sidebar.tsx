@@ -19,6 +19,7 @@ import {
   ChevronDown,
   LogOut
 } from 'lucide-react';
+import { useAuth } from '@/components/providers/AuthContext';
 import NavigationItem from './NavigationItem';
 
 const SIDEBAR_ITEMS = [
@@ -36,6 +37,17 @@ const SIDEBAR_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  const initials = user
+    ? `${user.firstname?.[0] ?? ''}${user.lastname?.[0] ?? ''}`.toUpperCase() || 'U'
+    : 'U';
+
+  const fullName = user
+    ? `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim() || user.email
+    : 'ผู้ใช้งาน';
+
+  const email = user?.email ?? '';
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col justify-between h-screen sticky top-0 transition-colors duration-300">
@@ -84,26 +96,27 @@ export default function Sidebar() {
         
         {/* User Card */}
         <div className="flex items-center gap-3 p-1 select-none">
-          <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10">
-            SJ
+          <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10 shrink-0">
+            {initials}
           </div>
           <div className="text-left overflow-hidden">
             <h4 className="text-sm font-bold text-foreground truncate">
-              Somchai Jaidee
+              {fullName}
             </h4>
             <p className="text-xs text-muted-foreground truncate">
-              somchai@example.com
+              {email}
             </p>
           </div>
         </div>
 
         {/* Logout Button */}
-        <Link href="/login" className="block">
-          <button className="w-full h-10 px-3 flex items-center gap-2.5 rounded-xl border border-border/80 bg-card hover:bg-destructive/10 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-all font-medium text-sm cursor-pointer active:scale-[0.98]">
-            <LogOut className="size-4.5" />
-            <span>ออกจากระบบ</span>
-          </button>
-        </Link>
+        <button
+          onClick={logout}
+          className="w-full h-10 px-3 flex items-center gap-2.5 rounded-xl border border-border/80 bg-card hover:bg-destructive/10 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-all font-medium text-sm cursor-pointer active:scale-[0.98]"
+        >
+          <LogOut className="size-4.5" />
+          <span>ออกจากระบบ</span>
+        </button>
 
       </div>
 

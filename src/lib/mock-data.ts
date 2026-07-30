@@ -225,6 +225,19 @@ export const mockActivityLogs = [
   { id: '4', userId: '1', action: 'REGISTER' as const, module: 'auth', description: 'สมัครสมาชิกใหม่', ipAddress: '172.16.0.10', createdAt: '2024-03-05T09:15:00Z', user: { firstname: 'Pattara', lastname: 'Naksakul' } },
 ];
 
+export const mockAdminUsers = [
+  { id: '1', name: 'Pattara Naksakul', email: 'test@mail.com', plan: 'Plus', status: 'active', joined: '2024-01-15', lastLogin: '2024-07-10 10:30' },
+  { id: '2', name: 'Siriporn Mala', email: 'siriporn@mail.com', plan: 'Go', status: 'active', joined: '2024-02-01', lastLogin: '2024-07-09 14:20' },
+  { id: '3', name: 'Wichai Boonma', email: 'wichai@mail.com', plan: 'Basic', status: 'active', joined: '2024-02-15', lastLogin: '2024-07-08 09:10' },
+  { id: '4', name: 'Nattaporn Kham', email: 'nattaporn@mail.com', plan: 'Free', status: 'suspended', joined: '2024-03-01', lastLogin: '2024-06-20 16:45' },
+];
+
+export const mockAdminPayments = [
+  { id: '1', user: 'Pattara Naksakul', plan: 'Plus', amount: 590, status: 'approved', date: '2024-07-01' },
+  { id: '2', user: 'Siriporn Mala', plan: 'Go', amount: 290, status: 'approved', date: '2024-07-02' },
+  { id: '3', user: 'Wichai Boonma', plan: 'Basic', amount: 120, status: 'pending', date: '2024-07-05' },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 export function formatCurrency(value: number, currency = '฿'): string {

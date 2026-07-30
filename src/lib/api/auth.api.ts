@@ -43,8 +43,8 @@ export const AuthApi = {
     });
   },
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
-    return apiFetch<AuthResponse>('/auth/register', {
+  async register(dto: RegisterDto): Promise<void> {
+    return apiFetch<void>('/auth/register', {
       method: 'POST',
       body: dto,
     });

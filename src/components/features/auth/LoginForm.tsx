@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Eye, EyeOff, Lock, Mail, TrendingUp } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthContext';
 import { Button } from '@/components/ui/button';
 
@@ -18,6 +19,8 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
+  const isRegistered = searchParams.get('registered') === 'true';
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,6 +107,13 @@ export function LoginForm() {
               เข้าสู่ระบบเพื่อดูพอร์ตการลงทุน
             </p>
           </div>
+
+          {isRegistered && !errorMsg && (
+            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-emerald-500/15 p-3.5 text-sm text-emerald-400 border border-emerald-500/25">
+              <CheckCircle2 className="size-4 shrink-0" />
+              <span>สมัครสมาชิกสำเร็จแล้ว! กรุณาเข้าสู่ระบบ</span>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="mt-4 rounded-xl bg-destructive/15 p-3 text-sm text-destructive border border-destructive/25">

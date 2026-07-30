@@ -152,8 +152,8 @@ export function RegisterForm() {
                   type="tel"
                 />
               </span>
-              {errors.phoneNumber && (
-                <p className="text-xs text-destructive">{errors.phoneNumber.message}</p>
+              {errors.phone && (
+                <p className="text-xs text-destructive">{errors.phone.message}</p>
               )}
             </div>
 

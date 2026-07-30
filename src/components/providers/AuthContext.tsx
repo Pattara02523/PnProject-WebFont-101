@@ -58,10 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (dto: RegisterDto) => {
     setLoading(true);
     try {
-      const response = await AuthApi.register(dto);
-      Cookies.set(AUTH_TOKEN_KEY, response.access_token, { expires: 7 });
-      setUser(response.user);
-      router.push('/dashboard');
+      await AuthApi.register(dto);
+      router.push('/login?registered=true');
     } catch (error) {
       setUser(null);
       throw error;

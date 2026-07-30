@@ -20,8 +20,9 @@ export default function AdminActivityLogsContent() {
   const [page, setPage] = useState(1);
 
   const filtered = logs.filter(l => {
-    const matchSearch = l.user.toLowerCase().includes(search.toLowerCase()) || l.description.toLowerCase().includes(search.toLowerCase());
-    const matchAction = filterAction === 'all' || l.action === filterAction;
+    const userName = `${l.user.firstname} ${l.user.lastname}`;
+    const matchSearch = userName.toLowerCase().includes(search.toLowerCase()) || l.description.toLowerCase().includes(search.toLowerCase());
+    const matchAction = filterAction === 'all' || l.action.toLowerCase() === filterAction.toLowerCase();
     return matchSearch && matchAction;
   });
 
@@ -54,7 +55,7 @@ export default function AdminActivityLogsContent() {
             </thead>
             <tbody>
               {filtered.map(log => {
-                const config = actionConfig[log.action];
+                const config = actionConfig[log.action.toLowerCase()];
                 const Icon = config?.icon || Settings;
                 return (
                   <tr key={log.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
@@ -63,13 +64,13 @@ export default function AdminActivityLogsContent() {
                         <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${config?.color}`}>
                           <Icon className="w-3.5 h-3.5" />
                         </div>
-                        <Badge variant={config?.variant}>{config?.label}</Badge>
+                        <Badge variant={config?.variant}>{config?.label || log.action}</Badge>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{log.user}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{log.user.firstname} {log.user.lastname}</td>
                     <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{log.description}</td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-400">{log.ip}</td>
-                    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{log.time}</td>
+                    <td className="px-4 py-3 text-xs font-mono text-slate-400">{log.ipAddress}</td>
+                    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleString('th-TH')}</td>
                   </tr>
                 );
               })}
