@@ -7,7 +7,8 @@ import { useAuth } from '@/components/providers/AuthContext';
 import { PortfolioApi } from '@/lib/api/portfolio.api';
 import { InvestmentApi } from '@/lib/api/investment.api';
 import { GoalApi } from '@/lib/api/goal.api';
-import { formatCurrency } from '@/lib/mock-data';
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
 import {
   TrendingUp,
   TrendingDown,
@@ -18,7 +19,7 @@ import {
   Target,
   ArrowUpRight,
   Sparkles,
-  PieChart
+  PieChart,
 } from 'lucide-react';
 
 export default function DashboardContent() {
@@ -45,27 +46,33 @@ export default function DashboardContent() {
     retry: false,
   });
 
-  const hasData = portfolios.length > 0 || investments.length > 0 || goals.length > 0;
+  const hasData =
+    portfolios.length > 0 || investments.length > 0 || goals.length > 0;
 
   // Fallback defaults matching mockups
   const dTotalValue = hasData
-    ? investments.reduce((sum, inv) => sum + (inv.currentPrice * inv.quantity), 0)
+    ? investments.reduce((sum, inv) => sum + inv.currentPrice * inv.quantity, 0)
     : 1465000;
 
   const dTotalInvested = hasData
-    ? investments.reduce((sum, inv) => sum + (inv.buyPrice * inv.quantity), 0)
+    ? investments.reduce((sum, inv) => sum + inv.purchasePrice * inv.quantity, 0)
     : 1330000;
 
-  const dProfit = hasData
-    ? dTotalValue - dTotalInvested
-    : 135000;
+  const dProfit = hasData ? dTotalValue - dTotalInvested : 135000;
 
   const dRoi = hasData
-    ? (dTotalInvested > 0 ? (dProfit / dTotalInvested) * 100 : 0)
+    ? dTotalInvested > 0
+      ? (dProfit / dTotalInvested) * 100
+      : 0
     : 10.15;
 
   const dLoss = hasData
-    ? investments.filter(inv => inv.currentPrice < inv.buyPrice).reduce((sum, inv) => sum + (inv.buyPrice - inv.currentPrice) * inv.quantity, 0)
+    ? investments
+        .filter((inv) => inv.currentPrice < inv.purchasePrice)
+        .reduce(
+          (sum, inv) => sum + (inv.purchasePrice - inv.currentPrice) * inv.quantity,
+          0,
+        )
     : 55000;
 
   const dAssetsCount = hasData ? investments.length : 17;
@@ -73,33 +80,31 @@ export default function DashboardContent() {
   const dGoalsCount = hasData ? goals.length : 3;
 
   const userInitials = user
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    ? `${user.firstname?.[0] ?? ''}${user.lastname?.[0] ?? ''}`.toUpperCase() ||
+      'SJ'
     : 'SJ';
 
   const userFullName = user
-    ? `${user.firstName} ${user.lastName}`
+    ? `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim() || 'สมชาย ใจดี'
     : 'สมชาย ใจดี';
 
   // Data for Asset Allocation Donut Chart
   const assetAllocation = [
     { name: 'หุ้นไทย/ต่างประเทศ', value: 55, color: '#10b981' }, // emerald-500
-    { name: 'คริปโตเคอเรนซี', value: 25, color: '#f59e0b' },     // amber-500
-    { name: 'กองทุนรวม/ETF', value: 15, color: '#3b82f6' },      // blue-500
-    { name: 'เงินสด', value: 5, color: '#8b5cf6' },              // violet-500
+    { name: 'คริปโตเคอเรนซี', value: 25, color: '#f59e0b' }, // amber-500
+    { name: 'กองทุนรวม/ETF', value: 15, color: '#3b82f6' }, // blue-500
+    { name: 'เงินสด', value: 5, color: '#8b5cf6' }, // violet-500
   ];
 
   return (
     <div className="space-y-6">
-      
       {/* 1. Welcome Banner Card */}
       <section className="bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
-        
         {/* Glow vector backdrops */}
         <div className="absolute top-0 right-0 size-64 bg-white/10 rounded-full blur-3xl -translate-y-12 translate-x-12 pointer-events-none"></div>
         <div className="absolute bottom-0 left-1/3 size-36 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
-          
           {/* Left: User Welcome info */}
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
             <div className="size-16 rounded-full border-2 border-white/20 bg-white/15 backdrop-blur-sm grid place-items-center text-2xl font-bold font-sans">
@@ -110,7 +115,9 @@ export default function DashboardContent() {
                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
                   ยินดีต้อนรับกลับ {userFullName}
                 </h1>
-                <span className="text-2xl animate-bounce origin-bottom">👋</span>
+                <span className="text-2xl animate-bounce origin-bottom">
+                  👋
+                </span>
               </div>
               <p className="text-sm text-emerald-50/90 font-medium mt-1">
                 Plan Gold <span className="mx-1.5">•</span> อัปเดตล่าสุดวันนี้
@@ -120,7 +127,6 @@ export default function DashboardContent() {
 
           {/* Right: Actions */}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            
             <button className="h-10 px-4 rounded-xl text-xs font-semibold bg-white text-emerald-700 hover:bg-emerald-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]">
               <Plus className="size-4" />
               เพิ่มการลงทุน
@@ -140,9 +146,7 @@ export default function DashboardContent() {
               <Download className="size-4" />
               Export
             </button>
-
           </div>
-
         </div>
       </section>
 
@@ -153,29 +157,32 @@ export default function DashboardContent() {
             title: 'สร้าง Portfolio แรก',
             desc: 'จัดกลุ่มสินทรัพย์ของคุณแยกตามเป้าหมาย',
             actionText: 'สร้าง Portfolio →',
-            color: 'from-pink-500/10 to-rose-500/10 hover:border-rose-500/30 text-rose-500 dark:text-rose-400',
+            color:
+              'from-pink-500/10 to-rose-500/10 hover:border-rose-500/30 text-rose-500 dark:text-rose-400',
             bgIcon: 'bg-rose-500/10 text-rose-500',
             icon: <Briefcase className="size-5" />,
-            link: '/portfolios'
+            link: '/portfolio',
           },
           {
             title: 'เพิ่มการลงทุน',
             desc: 'บันทึกประวัติการซื้อหุ้น กองทุน และคริปโต',
             actionText: 'เพิ่ม Investment →',
-            color: 'from-amber-500/10 to-orange-500/10 hover:border-orange-500/30 text-orange-500 dark:text-orange-400',
+            color:
+              'from-amber-500/10 to-orange-500/10 hover:border-orange-500/30 text-orange-500 dark:text-orange-400',
             bgIcon: 'bg-orange-500/10 text-orange-500',
             icon: <Plus className="size-5" />,
-            link: '/investments'
+            link: '/investment',
           },
           {
             title: 'ตั้งเป้าหมายการเงิน',
             desc: 'วางแผนเกษียณ ซื้อบ้าน หรือเป้าหมายระยะยาว',
             actionText: 'สร้างเป้าหมาย →',
-            color: 'from-indigo-500/10 to-blue-500/10 hover:border-blue-500/30 text-blue-500 dark:text-blue-400',
+            color:
+              'from-indigo-500/10 to-blue-500/10 hover:border-blue-500/30 text-blue-500 dark:text-blue-400',
             bgIcon: 'bg-blue-500/10 text-blue-500',
             icon: <Target className="size-5" />,
-            link: '/goals'
-          }
+            link: '/goal',
+          },
         ].map((card, i) => (
           <div
             key={i}
@@ -190,11 +197,16 @@ export default function DashboardContent() {
                   {card.desc}
                 </p>
               </div>
-              <div className={`size-9 rounded-xl flex items-center justify-center ${card.bgIcon}`}>
+              <div
+                className={`size-9 rounded-xl flex items-center justify-center ${card.bgIcon}`}
+              >
                 {card.icon}
               </div>
             </div>
-            <Link href={card.link} className="text-xs font-bold mt-4 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+            <Link
+              href={card.link}
+              className="text-xs font-bold mt-4 flex items-center gap-1 group-hover:translate-x-1 transition-transform"
+            >
               {card.actionText}
             </Link>
           </div>
@@ -277,7 +289,9 @@ export default function DashboardContent() {
               <span className="text-xs font-semibold text-muted-foreground truncate">
                 {metric.title}
               </span>
-              <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 ${metric.bgIcon}`}>
+              <div
+                className={`size-8 rounded-xl flex items-center justify-center shrink-0 ${metric.bgIcon}`}
+              >
                 {metric.icon}
               </div>
             </div>
@@ -309,26 +323,30 @@ export default function DashboardContent() {
 
       {/* 4. Charts Grid (Line Chart & Donut Chart) */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Left: Line Chart (2/3 width) */}
         <div className="lg:col-span-2 p-5 rounded-2xl border border-border/60 bg-card/65 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-foreground text-base">การเติบโตของพอร์ต (Portfolio Growth)</h3>
-              <p className="text-xs text-muted-foreground">ผลประกอบการสะสมในช่วง 12 เดือนที่ผ่านมา</p>
+              <h3 className="font-bold text-foreground text-base">
+                การเติบโตของพอร์ต (Portfolio Growth)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                ผลประกอบการสะสมในช่วง 12 เดือนที่ผ่านมา
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg flex items-center gap-1">
                 <ArrowUpRight className="size-3.5" />
                 +109.28%
               </span>
-              <span className="text-xs text-muted-foreground font-semibold">12 เดือนล่าสุด</span>
+              <span className="text-xs text-muted-foreground font-semibold">
+                12 เดือนล่าสุด
+              </span>
             </div>
           </div>
 
           {/* SVG Line Chart */}
           <div className="h-60 relative w-full pt-4">
-            
             {/* Grid Y-Lines */}
             <div className="absolute inset-y-0 inset-x-2 flex flex-col justify-between pointer-events-none opacity-40">
               <span className="w-full h-px border-t border-dashed border-border" />
@@ -338,7 +356,11 @@ export default function DashboardContent() {
             </div>
 
             {/* Line Chart Draw */}
-            <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
+            <svg
+              className="w-full h-full"
+              viewBox="0 0 600 200"
+              preserveAspectRatio="none"
+            >
               <defs>
                 <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
@@ -363,10 +385,38 @@ export default function DashboardContent() {
               />
 
               {/* Glowing Dots */}
-              <circle cx="150" cy="130" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="300" cy="90" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="450" cy="60" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="600" cy="45" r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+              <circle
+                cx="150"
+                cy="130"
+                r="4.5"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="300"
+                cy="90"
+                r="4.5"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="450"
+                cy="60"
+                r="4.5"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="600"
+                cy="45"
+                r="5"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
             </svg>
           </div>
 
@@ -385,66 +435,99 @@ export default function DashboardContent() {
         {/* Right: Donut Chart (1/3 width) */}
         <div className="p-5 rounded-2xl border border-border/60 bg-card/65 shadow-sm space-y-6 flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-foreground text-base">สัดส่วนสินทรัพย์ (Asset Allocation)</h3>
-            <p className="text-xs text-muted-foreground">สัดส่วนตามประเภทของกองทุนและหุ้น</p>
+            <h3 className="font-bold text-foreground text-base">
+              สัดส่วนสินทรัพย์ (Asset Allocation)
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              สัดส่วนตามประเภทของกองทุนและหุ้น
+            </p>
           </div>
 
           {/* SVG Donut Chart wrapper */}
           <div className="flex items-center justify-center py-4 relative">
             <svg className="size-40" viewBox="0 0 36 36">
-              
               {/* Violet Segment (5%) */}
               <circle
-                cx="18" cy="18" r="15.915"
-                fill="transparent" stroke="#8b5cf6" strokeWidth="3"
-                strokeDasharray="5 95" strokeDashoffset="25"
+                cx="18"
+                cy="18"
+                r="15.915"
+                fill="transparent"
+                stroke="#8b5cf6"
+                strokeWidth="3"
+                strokeDasharray="5 95"
+                strokeDashoffset="25"
               />
 
               {/* Blue Segment (15%) */}
               <circle
-                cx="18" cy="18" r="15.915"
-                fill="transparent" stroke="#3b82f6" strokeWidth="3"
-                strokeDasharray="15 85" strokeDashoffset="20"
+                cx="18"
+                cy="18"
+                r="15.915"
+                fill="transparent"
+                stroke="#3b82f6"
+                strokeWidth="3"
+                strokeDasharray="15 85"
+                strokeDashoffset="20"
               />
 
               {/* Amber Segment (25%) */}
               <circle
-                cx="18" cy="18" r="15.915"
-                fill="transparent" stroke="#f59e0b" strokeWidth="3"
-                strokeDasharray="25 75" strokeDashoffset="5"
+                cx="18"
+                cy="18"
+                r="15.915"
+                fill="transparent"
+                stroke="#f59e0b"
+                strokeWidth="3"
+                strokeDasharray="25 75"
+                strokeDashoffset="5"
               />
 
               {/* Emerald Segment (55%) */}
               <circle
-                cx="18" cy="18" r="15.915"
-                fill="transparent" stroke="#10b981" strokeWidth="3"
-                strokeDasharray="55 45" strokeDashoffset="80"
+                cx="18"
+                cy="18"
+                r="15.915"
+                fill="transparent"
+                stroke="#10b981"
+                strokeWidth="3"
+                strokeDasharray="55 45"
+                strokeDashoffset="80"
               />
             </svg>
-            
+
             {/* Center label inside donut */}
             <div className="absolute flex flex-col items-center select-none">
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase">มูลค่าพอร์ต</span>
-              <span className="text-base font-extrabold text-foreground">฿1.46M</span>
+              <span className="text-[10px] text-muted-foreground font-semibold uppercase">
+                มูลค่าพอร์ต
+              </span>
+              <span className="text-base font-extrabold text-foreground">
+                ฿1.46M
+              </span>
             </div>
           </div>
 
           {/* Legends list */}
           <div className="space-y-2 mt-4">
             {assetAllocation.map((item, index) => (
-              <div key={index} className="flex items-center justify-between text-xs">
+              <div
+                key={index}
+                className="flex items-center justify-between text-xs"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="size-3 rounded" style={{ backgroundColor: item.color }}></span>
-                  <span className="text-muted-foreground font-medium">{item.name}</span>
+                  <span
+                    className="size-3 rounded"
+                    style={{ backgroundColor: item.color }}
+                  ></span>
+                  <span className="text-muted-foreground font-medium">
+                    {item.name}
+                  </span>
                 </div>
                 <span className="font-bold text-foreground">{item.value}%</span>
               </div>
             ))}
           </div>
         </div>
-
       </section>
-
     </div>
   );
 }

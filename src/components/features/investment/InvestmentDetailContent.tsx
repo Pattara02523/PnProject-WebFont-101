@@ -2,33 +2,65 @@
 
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, TrendingUp, TrendingDown, Edit2, Save, ArrowDownRight, ArrowUpRight, DollarSign, PiggyBank, CreditCard, AlertTriangle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, TrendingUp, TrendingDown, Edit2, Save, ArrowDownRight, ArrowUpRight, DollarSign, PiggyBank, CreditCard, AlertTriangle, Loader2 } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui/index';
-import { mockInvestments, mockTransactions, formatCurrency, formatPercent } from '@/lib/mock-data';
+import { InvestmentApi } from '@/lib/api/investment.api';
+import { TransactionApi } from '@/lib/api/transaction.api';
 
-const riskLabels: Record<string, string> = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง' };
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
+const formatPercent = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+
+const riskLabels: Record<string, string> = { LOW: 'ต่ำ', MEDIUM: 'ปานกลาง', HIGH: 'สูง' };
 const riskColors: Record<string, string> = {
-  low: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400',
-  medium: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400',
-  high: 'text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400'
+  LOW:    'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400',
+  MEDIUM: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400',
+  HIGH:   'text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400',
 };
 
 const txTypeConfig: Record<string, { label: string; icon: any; color: string }> = {
-  buy:      { label: 'ซื้อ',       icon: ArrowDownRight, color: 'text-blue-600' },
-  sell:     { label: 'ขาย',        icon: ArrowUpRight,   color: 'text-emerald-600' },
-  dividend: { label: 'เงินปันผล', icon: DollarSign,     color: 'text-purple-600' },
-  deposit:  { label: 'ฝาก',        icon: PiggyBank,      color: 'text-emerald-600' },
-  withdraw: { label: 'ถอน',        icon: CreditCard,     color: 'text-red-600' },
+  BUY:      { label: 'ซื้อ',       icon: ArrowDownRight, color: 'text-blue-600' },
+  SELL:     { label: 'ขาย',        icon: ArrowUpRight,   color: 'text-emerald-600' },
+  DIVIDEND: { label: 'เงินปันผล', icon: DollarSign,     color: 'text-purple-600' },
+  DEPOSIT:  { label: 'ฝาก',        icon: PiggyBank,      color: 'text-emerald-600' },
+  WITHDRAW: { label: 'ถอน',        icon: CreditCard,     color: 'text-red-600' },
+};
+
+const typeLabels: Record<string, string> = {
+  STOCK: 'หุ้น', ETF: 'ETF', FUND: 'กองทุน', CRYPTO: 'คริปโต', GOLD: 'ทอง', BOND: 'ตราสารหนี้',
 };
 
 export default function InvestmentDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const id = params?.id as string;
-  const asset = mockInvestments.find(i => i.id === id);
-  const [notes, setNotes] = useState((asset as any)?.notes || '');
+
+  const [notes, setNotes] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
-  const [savedNotes, setSavedNotes] = useState(notes);
+  const [savedNotes, setSavedNotes] = useState('');
+
+  const { data: asset, isLoading: loadingAsset } = useQuery({
+    queryKey: ['investment', id],
+    queryFn: () => InvestmentApi.findOne(id),
+    retry: false,
+    enabled: !!id,
+  });
+
+  const { data: allTransactions = [], isLoading: loadingTx } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: () => TransactionApi.findAll(),
+    retry: false,
+  });
+
+  if (loadingAsset || loadingTx) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
 
   if (!asset) {
     return (
@@ -42,13 +74,22 @@ export default function InvestmentDetailContent() {
     );
   }
 
-  const relatedTx = mockTransactions.filter(t => t.symbol === asset.symbol);
-  const profit = asset.profit;
-  const roi = asset.roi;
+  const relatedTx = allTransactions.filter(t => t.investmentId === asset.id);
+  const costBasis = asset.purchasePrice * asset.quantity;
   const totalValue = asset.currentPrice * asset.quantity;
-  const costBasis = asset.buyPrice * asset.quantity;
+  const profit = totalValue - costBasis;
+  const roi = asset.purchasePrice > 0 ? ((asset.currentPrice - asset.purchasePrice) / asset.purchasePrice) * 100 : 0;
 
-  const handleSaveNotes = () => { setSavedNotes(notes); setEditingNotes(false); };
+  const handleSaveNotes = async () => {
+    try {
+      await InvestmentApi.update(asset.id, { note: notes });
+      queryClient.invalidateQueries({ queryKey: ['investment', id] });
+      setSavedNotes(notes);
+      setEditingNotes(false);
+    } catch (err) {
+      console.error('Save notes failed:', err);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto flex flex-col gap-6">
@@ -61,18 +102,17 @@ export default function InvestmentDetailContent() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-4 flex-1">
-          {/* Asset logo placeholder */}
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-100 dark:shadow-emerald-900/30 flex-shrink-0">
             <span className="text-white text-lg font-extrabold tracking-tight">{asset.symbol.slice(0, 2)}</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{asset.name}</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{asset.assetName}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-slate-400">{asset.symbol}</span>
               <span className="text-slate-200 dark:text-slate-700">·</span>
-              <Badge variant="neutral">{asset.type}</Badge>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${riskColors[asset.risk]}`}>
-                ความเสี่ยง: {riskLabels[asset.risk]}
+              <Badge variant="neutral">{typeLabels[asset.assetType] ?? asset.assetType}</Badge>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${riskColors[asset.riskLevel]}`}>
+                ความเสี่ยง: {riskLabels[asset.riskLevel]}
               </span>
             </div>
           </div>
@@ -83,7 +123,7 @@ export default function InvestmentDetailContent() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <p className="text-xs text-slate-400 mb-1">ราคาซื้อเฉลี่ย</p>
-          <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(asset.buyPrice)}</p>
+          <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(asset.purchasePrice)}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-slate-400 mb-1">ราคาปัจจุบัน</p>
@@ -91,7 +131,7 @@ export default function InvestmentDetailContent() {
           <div className="flex items-center gap-1 mt-0.5">
             {profit >= 0 ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
             <span className={`text-xs font-medium ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {profit >= 0 ? '+' : ''}{formatPercent(asset.buyPrice > 0 ? ((asset.currentPrice - asset.buyPrice) / asset.buyPrice) * 100 : 0)}
+              {roi >= 0 ? '+' : ''}{formatPercent(roi)}
             </span>
           </div>
         </Card>
@@ -117,8 +157,9 @@ export default function InvestmentDetailContent() {
             ['จำนวนที่ถือ', `${asset.quantity.toLocaleString()} หน่วย`],
             ['ต้นทุนรวม', formatCurrency(costBasis)],
             ['มูลค่าตลาดปัจจุบัน', formatCurrency(totalValue)],
-            ['วันที่ลงทุน', asset.investDate],
-            ['Portfolio', asset.portfolioId === '1' ? 'หุ้นไทย' : 'Global ETF'],
+            ['ต้นทุนเฉลี่ย/หน่วย', formatCurrency(asset.averageCost)],
+            ['วันที่ลงทุน', asset.investmentDate?.split('T')[0] ?? '-'],
+            ['Portfolio ID', asset.portfolioId],
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between items-center border-b border-slate-50 dark:border-slate-800 pb-3 last:border-0 last:pb-0">
               <span className="text-sm text-slate-500 dark:text-slate-400">{label}</span>
@@ -135,7 +176,7 @@ export default function InvestmentDetailContent() {
                 <Save className="w-3.5 h-3.5" /> บันทึก
               </button>
             ) : (
-              <button onClick={() => setEditingNotes(true)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              <button onClick={() => { setNotes(asset.note ?? ''); setEditingNotes(true); }} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                 <Edit2 className="w-3.5 h-3.5" /> แก้ไข
               </button>
             )}
@@ -150,10 +191,10 @@ export default function InvestmentDetailContent() {
             />
           ) : (
             <div
-              onClick={() => setEditingNotes(true)}
+              onClick={() => { setNotes(asset.note ?? ''); setEditingNotes(true); }}
               className="flex-1 min-h-[120px] p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-400 cursor-text"
             >
-              {savedNotes || <span className="text-slate-300 dark:text-slate-600 italic">คลิกเพื่อเพิ่มโน้ต...</span>}
+              {asset.note || savedNotes || <span className="text-slate-300 dark:text-slate-600 italic">คลิกเพื่อเพิ่มโน้ต...</span>}
             </div>
           )}
 
@@ -176,7 +217,7 @@ export default function InvestmentDetailContent() {
       {/* Transaction history */}
       <Card>
         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">ประวัติการซื้อขาย</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">ประวัติการซื้อขาย ({relatedTx.length})</h3>
         </div>
         {relatedTx.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -199,7 +240,7 @@ export default function InvestmentDetailContent() {
                 {relatedTx.map(tx => {
                   const cfg = txTypeConfig[tx.type];
                   const TxIcon = cfg?.icon;
-                  const isIn = ['sell', 'dividend', 'deposit'].includes(tx.type);
+                  const isIn = ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(tx.type);
                   return (
                     <tr key={tx.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                       <td className="px-4 py-3">
@@ -210,14 +251,16 @@ export default function InvestmentDetailContent() {
                           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{cfg?.label}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{formatCurrency(tx.price)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{tx.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{tx.price !== undefined ? formatCurrency(tx.price) : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{tx.quantity !== undefined ? tx.quantity.toLocaleString() : '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-semibold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
                           {isIn ? '+' : '-'}{formatCurrency(tx.amount)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{tx.date}</td>
+                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+                        {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('th-TH') : '-'}
+                      </td>
                       <td className="px-4 py-3 text-xs text-slate-400 max-w-xs truncate">{tx.note || '-'}</td>
                     </tr>
                   );

@@ -1,33 +1,39 @@
 import { apiFetch } from './api-fetch';
 
+// ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────
+
 export type User = {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstname: string;
+  lastname: string;
   email: string;
-  phoneNumber?: string;
+  phone?: string;
+  avatarUrl?: string;
   role: 'USER' | 'ADMIN';
+  status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
   createdAt: string;
   updatedAt: string;
 };
 
 export type AuthResponse = {
-  token: string;
+  access_token: string;
   user: User;
 };
 
 export type LoginDto = {
   email: string;
-  password?: string;
+  password: string;
 };
 
 export type RegisterDto = {
-  firstName: string;
-  lastName: string;
+  firstname: string;
+  lastname: string;
   email: string;
-  phoneNumber?: string;
-  password?: string;
+  phone?: string;
+  password: string;
 };
+
+// ─── API Methods ─────────────────────────────────────────────────────
 
 export const AuthApi = {
   async login(dto: LoginDto): Promise<AuthResponse> {

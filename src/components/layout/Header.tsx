@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import { Search, Bell } from 'lucide-react';

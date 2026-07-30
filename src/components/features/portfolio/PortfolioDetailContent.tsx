@@ -2,20 +2,47 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, TrendingDown, Shield, DollarSign, Briefcase } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Briefcase, Loader2 } from 'lucide-react';
 import { Card, Badge } from '@/components/ui';
-import { mockPortfolios, mockInvestments, formatCurrency } from '@/lib/mock-data';
+import { PortfolioApi } from '@/lib/api/portfolio.api';
+import { InvestmentApi, Investment } from '@/lib/api/investment.api';
 
 interface PortfolioDetailContentProps {
   id: string;
 }
 
-export default function PortfolioDetailContent({ id }: PortfolioDetailContentProps) {
-  // Translate string IDs from UI mocks if needed
-  const resolvedId = id === 'thai-portfolio' ? '1' : id === 'foreign-portfolio' ? '2' : id === 'crypto-portfolio' ? '3' : id;
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
 
-  const portfolio = mockPortfolios.find(p => p.id === resolvedId);
-  const investments = mockInvestments.filter(inv => inv.portfolioId === resolvedId);
+const riskBadges: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  LOW: 'success', MEDIUM: 'warning', HIGH: 'danger',
+};
+const riskText: Record<string, string> = { LOW: 'ต่ำ', MEDIUM: 'กลาง', HIGH: 'สูง' };
+const typeLabels: Record<string, string> = { STOCK: 'หุ้น', ETF: 'ETF', FUND: 'กองทุน', CRYPTO: 'คริปโต', GOLD: 'ทอง', BOND: 'ตราสารหนี้' };
+
+export default function PortfolioDetailContent({ id }: PortfolioDetailContentProps) {
+  const { data: portfolio, isLoading: loadingPortfolio } = useQuery({
+    queryKey: ['portfolio', id],
+    queryFn: () => PortfolioApi.findOne(id),
+    retry: false,
+  });
+
+  const { data: allInvestments = [], isLoading: loadingInvestments } = useQuery({
+    queryKey: ['investments'],
+    queryFn: () => InvestmentApi.findAll(),
+    retry: false,
+  });
+
+  const investments = allInvestments.filter(inv => inv.portfolioId === id);
+
+  if (loadingPortfolio || loadingInvestments) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
 
   if (!portfolio) {
     return (
@@ -28,7 +55,12 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
     );
   }
 
-  const isPositive = portfolio.profit >= 0;
+  // คำนวณ metrics จาก investments จริง
+  const totalValue = investments.reduce((sum, inv) => sum + inv.currentPrice * inv.quantity, 0);
+  const totalInvested = investments.reduce((sum, inv) => sum + inv.purchasePrice * inv.quantity, 0);
+  const profit = totalValue - totalInvested;
+  const roi = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
+  const isPositive = profit >= 0;
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
@@ -38,7 +70,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
           <ArrowLeft className="w-4 h-4" /> กลับไปหน้าพอร์ตโฟลิโอ
         </Link>
         <Badge variant={isPositive ? 'success' : 'danger'} className="text-xs font-semibold">
-          ROI {portfolio.roi}%
+          ROI {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
         </Badge>
       </div>
 
@@ -46,13 +78,18 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-2xl border border-border/60">
         <div>
           <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: portfolio.color }} />
+            {portfolio.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: portfolio.color }} />}
             <h1 className="text-2xl font-extrabold text-foreground">{portfolio.name}</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{portfolio.description}</p>
+          {portfolio.description && <p className="text-sm text-muted-foreground mt-1">{portfolio.description}</p>}
         </div>
-        <div className="text-xs text-muted-foreground/80 font-medium">
-          วันที่สร้าง: {portfolio.createdAt}
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs text-muted-foreground/80 font-medium">
+            สินทรัพย์ {portfolio._count?.investments ?? investments.length} รายการ
+          </span>
+          <span className="text-xs text-muted-foreground/80 font-medium">
+            วันที่สร้าง: {portfolio.createdAt?.split('T')[0] ?? '-'}
+          </span>
         </div>
       </div>
 
@@ -63,9 +100,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
             <span className="text-xs font-medium uppercase">มูลค่ารวมพอร์ต</span>
             <Briefcase className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-2xl font-extrabold text-foreground">
-            {formatCurrency(portfolio.totalValue)}
-          </p>
+          <p className="text-2xl font-extrabold text-foreground">{formatCurrency(totalValue)}</p>
         </Card>
 
         <Card className="p-5 flex flex-col justify-between">
@@ -73,9 +108,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
             <span className="text-xs font-medium uppercase">เงินลงทุนเริ่มต้น</span>
             <DollarSign className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-2xl font-extrabold text-foreground">
-            {formatCurrency(portfolio.invested)}
-          </p>
+          <p className="text-2xl font-extrabold text-foreground">{formatCurrency(totalInvested)}</p>
         </Card>
 
         <Card className="p-5 flex flex-col justify-between">
@@ -84,7 +117,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
             {isPositive ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
           </div>
           <p className={`text-2xl font-extrabold ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {isPositive ? '+' : ''}{formatCurrency(portfolio.profit)}
+            {isPositive ? '+' : ''}{formatCurrency(profit)}
           </p>
         </Card>
 
@@ -94,7 +127,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
             <span className="text-xs font-bold text-muted-foreground">%</span>
           </div>
           <p className={`text-2xl font-extrabold ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {portfolio.roi}%
+            {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
           </p>
         </Card>
       </div>
@@ -104,7 +137,7 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
         <div className="p-5 border-b border-border/60">
           <h2 className="text-base font-bold text-foreground">สินทรัพย์ในพอร์ต ({investments.length})</h2>
         </div>
-        
+
         {investments.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
             ยังไม่มีสินทรัพย์ในพอร์ตโฟลิโอนี้
@@ -125,49 +158,37 @@ export default function PortfolioDetailContent({ id }: PortfolioDetailContentPro
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-sm">
-                {investments.map((inv) => {
-                  const assetRoiPositive = inv.roi >= 0;
+                {investments.map(inv => {
+                  const invRoi = inv.purchasePrice > 0
+                    ? ((inv.currentPrice - inv.purchasePrice) / inv.purchasePrice) * 100
+                    : 0;
+                  const assetRoiPositive = invRoi >= 0;
                   const currentValue = inv.quantity * inv.currentPrice;
-                  
-                  // Resolve risk level colors
-                  const riskBadges: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-                    low: 'success',
-                    medium: 'warning',
-                    high: 'danger',
-                  };
-                  const riskText: Record<string, string> = {
-                    low: 'ต่ำ',
-                    medium: 'กลาง',
-                    high: 'สูง',
-                  };
 
                   return (
                     <tr key={inv.id} className="hover:bg-muted/10 transition-colors">
                       <td className="p-4 pl-6">
                         <div>
-                          <h4 className="font-bold text-foreground">{inv.name}</h4>
+                          <h4 className="font-bold text-foreground">{inv.assetName}</h4>
                           <span className="text-xs text-muted-foreground">{inv.symbol}</span>
                         </div>
                       </td>
                       <td className="p-4 text-muted-foreground font-medium">
-                        {inv.type} ({inv.category})
+                        {typeLabels[inv.assetType] ?? inv.assetType}
+                        {inv.category && <span className="text-xs ml-1">({inv.category.name})</span>}
                       </td>
                       <td className="p-4">
-                        <Badge variant={riskBadges[inv.risk] || 'neutral'}>
-                          {riskText[inv.risk] || inv.risk}
+                        <Badge variant={riskBadges[inv.riskLevel] || 'neutral'}>
+                          {riskText[inv.riskLevel] || inv.riskLevel}
                         </Badge>
                       </td>
-                      <td className="p-4 font-medium text-foreground">
-                        {formatCurrency(inv.buyPrice)}
-                      </td>
-                      <td className="p-4 font-medium text-foreground">
-                        {formatCurrency(inv.currentPrice)}
-                      </td>
+                      <td className="p-4 font-medium text-foreground">{formatCurrency(inv.purchasePrice)}</td>
+                      <td className="p-4 font-medium text-foreground">{formatCurrency(inv.currentPrice)}</td>
                       <td className="p-4 font-medium text-foreground">
                         {inv.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                       </td>
                       <td className={`p-4 font-bold ${assetRoiPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {assetRoiPositive ? '+' : ''}{inv.roi}%
+                        {assetRoiPositive ? '+' : ''}{invRoi.toFixed(2)}%
                       </td>
                       <td className="p-4 pr-6 text-right font-bold text-foreground">
                         {formatCurrency(currentValue)}

@@ -11,14 +11,14 @@ import { Button } from '@/components/ui/button';
 
 const registerSchema = z
   .object({
-    firstName: z.string().min(1, 'กรุณากรอกชื่อจริง'),
-    lastName: z.string().min(1, 'กรุณากรอกนามสกุล'),
+    firstname: z.string().min(1, 'กรุณากรอกชื่อจริง'),
+    lastname: z.string().min(1, 'กรุณากรอกนามสกุล'),
     email: z.string().min(1, 'กรุณากรอกอีเมล').email('รูปแบบอีเมลไม่ถูกต้อง'),
-    phoneNumber: z.string().optional(),
+    phone: z.string().optional(),
     password: z.string().min(6, 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'),
     confirmPassword: z.string().min(6, 'กรุณากรอกยืนยันรหัสผ่าน'),
-    acceptTerms: z.literal(true, {
-      errorMap: () => ({ message: 'กรุณายอมรับข้อกำหนดการใช้งานและนโยบายความเป็นส่วนตัว' }),
+    acceptTerms: z.boolean().refine((val) => val === true, {
+      message: 'กรุณายอมรับข้อกำหนดการใช้งานและนโยบายความเป็นส่วนตัว',
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -41,10 +41,10 @@ export function RegisterForm() {
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
+      firstname: '',
+      lastname: '',
       email: '',
-      phoneNumber: '',
+      phone: '',
       password: '',
       confirmPassword: '',
       acceptTerms: false as any,
@@ -56,10 +56,10 @@ export function RegisterForm() {
     setIsSubmitting(true);
     try {
       await signup({
-        firstName: data.firstName,
-        lastName: data.lastName,
+        firstname: data.firstname,
+        lastname: data.lastname,
         email: data.email,
-        phoneNumber: data.phoneNumber,
+        phone: data.phone,
         password: data.password,
       });
     } catch (err: any) {
@@ -97,30 +97,30 @@ export function RegisterForm() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">ชื่อ</label>
-                <span className={`flex h-11 items-center gap-3 rounded-xl border bg-background px-3 text-muted-foreground focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.firstName ? 'border-destructive' : 'border-border'}`}>
+                <span className={`flex h-11 items-center gap-3 rounded-xl border bg-background px-3 text-muted-foreground focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.firstname ? 'border-destructive' : 'border-border'}`}>
                   <UserIcon className="size-4" />
                   <input
-                    {...register('firstName')}
+                    {...register('firstname')}
                     className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm"
                     placeholder="ชื่อจริง"
                   />
                 </span>
-                {errors.firstName && (
-                  <p className="text-xs text-destructive">{errors.firstName.message}</p>
+                {errors.firstname && (
+                  <p className="text-xs text-destructive">{errors.firstname.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">นามสกุล</label>
-                <span className={`flex h-11 items-center rounded-xl border bg-background px-3 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.lastName ? 'border-destructive' : 'border-border'}`}>
+                <span className={`flex h-11 items-center rounded-xl border bg-background px-3 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.lastname ? 'border-destructive' : 'border-border'}`}>
                   <input
-                    {...register('lastName')}
+                    {...register('lastname')}
                     className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm"
                     placeholder="นามสกุล"
                   />
                 </span>
-                {errors.lastName && (
-                  <p className="text-xs text-destructive">{errors.lastName.message}</p>
+                {errors.lastname && (
+                  <p className="text-xs text-destructive">{errors.lastname.message}</p>
                 )}
               </div>
             </div>
@@ -143,10 +143,10 @@ export function RegisterForm() {
 
             <div className="space-y-2">
               <label className="block text-sm font-medium">เบอร์โทรศัพท์</label>
-              <span className={`flex h-11 items-center gap-3 rounded-xl border bg-background px-3 text-muted-foreground focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.phoneNumber ? 'border-destructive' : 'border-border'}`}>
+              <span className={`flex h-11 items-center gap-3 rounded-xl border bg-background px-3 text-muted-foreground focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/60 transition-all ${errors.phone ? 'border-destructive' : 'border-border'}`}>
                 <Phone className="size-4" />
                 <input
-                  {...register('phoneNumber')}
+                  {...register('phone')}
                   className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm"
                   placeholder="081-234-5678"
                   type="tel"

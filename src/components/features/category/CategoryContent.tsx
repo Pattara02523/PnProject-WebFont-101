@@ -1,67 +1,70 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target } from 'lucide-react';
-import { Card, Button, Badge, Modal, EmptyState, ConfirmDialog } from '@/components/ui/index';
-import { useQuery } from '@tanstack/react-query';
-import { CategoryApi } from '@/lib/api/category.api';
-import { mockCategories } from '@/lib/mock-data';
+import { Plus, Edit2, Trash2, Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target, Loader2 } from 'lucide-react';
+import { Card, Button, Modal, EmptyState, ConfirmDialog } from '@/components/ui/index';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CategoryApi, Category, CreateCategoryDto } from '@/lib/api/category.api';
 
 const iconOptions = ['Tag', 'Zap', 'Building2', 'Cpu', 'Home', 'TrendingUp', 'Star', 'Globe', 'Shield', 'Target'];
 const colorOptions = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#f97316', '#84cc16', '#64748b'];
-
 const IconMap: Record<string, any> = { Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target };
 
-interface Category { id: string; name: string; icon: string; color: string; count: number }
+const EMPTY_FORM: CreateCategoryDto = { name: '', icon: 'Tag', color: '#10b981' };
 
 export default function CategoryContent() {
-  // Load categories from REST API using React Query
-  const { data: apiCategories = [] } = useQuery({
+  const queryClient = useQueryClient();
+
+  const { data: categories = [], isLoading } = useQuery({
     queryKey: ['categories'],
     queryFn: () => CategoryApi.findAll(),
     retry: false,
   });
 
-  const [localCategories, setLocalCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', icon: 'Tag', color: '#10b981' });
+  const [form, setForm] = useState<CreateCategoryDto>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
 
-  const categories = useMemo(() => {
-    if (apiCategories && apiCategories.length > 0) {
-      return apiCategories;
+  const openCreate = () => { setForm(EMPTY_FORM); setEditItem(null); setShowForm(true); };
+  const openEdit = (c: Category) => { setForm({ name: c.name, icon: c.icon ?? 'Tag', color: c.color ?? '#10b981', description: c.description }); setEditItem(c); setShowForm(true); };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (editItem) {
+        await CategoryApi.update(editItem.id, form);
+      } else {
+        await CategoryApi.create(form);
+      }
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setShowForm(false);
+    } catch (err) {
+      console.error('Save category failed:', err);
+    } finally {
+      setSaving(false);
     }
-    return localCategories.length > 0 ? localCategories : mockCategories;
-  }, [apiCategories, localCategories]);
-
-  const openCreate = () => { setForm({ name: '', icon: 'Tag', color: '#10b981' }); setEditItem(null); setShowForm(true); };
-  const openEdit = (c: Category) => { setForm({ name: c.name, icon: c.icon, color: c.color }); setEditItem(c); setShowForm(true); };
-
-  const handleSave = () => {
-    // Categories are managed locally as fallback
-    if (editItem) {
-      setLocalCategories(cs => {
-        const current = cs.length > 0 ? cs : [...mockCategories];
-        return current.map(c => c.id === editItem.id ? { ...c, ...form } : c);
-      });
-    } else {
-      setLocalCategories(cs => {
-        const current = cs.length > 0 ? cs : [...mockCategories];
-        return [...current, { id: Date.now().toString(), ...form, count: 0 }];
-      });
-    }
-    setShowForm(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    setLocalCategories(cs => {
-      const current = cs.length > 0 ? cs : [...mockCategories];
-      return current.filter(c => c.id !== deleteId);
-    });
+    try {
+      await CategoryApi.delete(deleteId);
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    } catch (err) {
+      console.error('Delete category failed:', err);
+    }
     setDeleteId(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -76,12 +79,14 @@ export default function CategoryContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map(c => {
-              const Icon = IconMap[c.icon] || Tag;
+              const Icon = IconMap[c.icon ?? 'Tag'] || Tag;
+              const count = c._count?.investments ?? 0;
+              const color = c.color ?? '#10b981';
               return (
                 <Card key={c.id} className="p-5">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: c.color + '20' }}>
-                      <Icon className="w-6 h-6" style={{ color: c.color }} />
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color + '20' }}>
+                      <Icon className="w-6 h-6" style={{ color }} />
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -89,9 +94,10 @@ export default function CategoryContent() {
                     </div>
                   </div>
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">{c.name}</h3>
+                  {c.description && <p className="text-xs text-slate-400 mb-2">{c.description}</p>}
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{c.count} สินทรัพย์</span>
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-sm text-slate-500 dark:text-slate-400">{count} สินทรัพย์</span>
                   </div>
                 </Card>
               );
@@ -105,6 +111,10 @@ export default function CategoryContent() {
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">ชื่อหมวดหมู่</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="เช่น เทคโนโลยี, พลังงาน" className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">คำอธิบาย</label>
+            <input value={form.description ?? ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="คำอธิบาย (ไม่บังคับ)" className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">ไอคอน</label>
@@ -129,7 +139,9 @@ export default function CategoryContent() {
           </div>
           <div className="flex gap-3 mt-2">
             <Button variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>ยกเลิก</Button>
-            <Button className="flex-1" onClick={handleSave}>{editItem ? 'บันทึก' : 'สร้าง'}</Button>
+            <Button className="flex-1" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editItem ? 'บันทึก' : 'สร้าง')}
+            </Button>
           </div>
         </div>
       </Modal>

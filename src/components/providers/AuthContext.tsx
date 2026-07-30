@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const response = await AuthApi.login(dto);
-      Cookies.set(AUTH_TOKEN_KEY, response.token, { expires: 7 }); // expires in 7 days
+      Cookies.set(AUTH_TOKEN_KEY, response.access_token, { expires: 7 }); // expires in 7 days
       setUser(response.user);
       router.push('/dashboard');
     } catch (error) {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const response = await AuthApi.register(dto);
-      Cookies.set(AUTH_TOKEN_KEY, response.token, { expires: 7 });
+      Cookies.set(AUTH_TOKEN_KEY, response.access_token, { expires: 7 });
       setUser(response.user);
       router.push('/dashboard');
     } catch (error) {
