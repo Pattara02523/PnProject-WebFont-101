@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { AuthApi, User, LoginDto, RegisterDto } from '@/lib/api/auth.api';
 
 type AuthContextType = {
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     async function loadUserFromCookie() {
@@ -72,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     Cookies.remove(AUTH_TOKEN_KEY);
     setUser(null);
+    // Clear React Query cache so the next user doesn't see stale data
+    queryClient.clear();
     router.push('/login');
   };
 
