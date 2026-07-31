@@ -8,13 +8,13 @@ import {
 import { GoalApi, Goal, CreateGoalDto, UpdateGoalDto } from '@/lib/api/goal.api';
 
 const STATUS_CONFIG = {
-  IN_PROGRESS: { label: 'กำลังดำเนินการ', icon: Clock,         color: 'text-blue-600',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
-  COMPLETED:   { label: 'สำเร็จแล้ว',     icon: CheckCircle2,   color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-  CANCELLED:   { label: 'ยกเลิก',          icon: XCircle,        color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+  IN_PROGRESS: { label: 'กำลังดำเนินการ', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+  COMPLETED: { label: 'สำเร็จแล้ว', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  FAILED: { label: 'ไม่สำเร็จ', icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20' },
 };
 
 const emptyForm = {
-  name: '', description: '', targetAmount: '', currentAmount: '', targetDate: '',
+  title: '', description: '', targetAmount: '', currentAmount: '', deadline: '',
 };
 
 const fmtCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -33,8 +33,8 @@ export default function GoalContent() {
     try {
       setLoading(true);
       setError(null);
-      const data = await GoalApi.getAll();
-      setGoals(data);
+      const data = await GoalApi.findAll();
+      setGoals(data || []);
     } catch (e: any) {
       setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
@@ -46,18 +46,18 @@ export default function GoalContent() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm });
+    setForm({ ...emptyForm, deadline: new Date().toISOString().slice(0, 10) });
     setShowModal(true);
   };
 
   const openEdit = (goal: Goal) => {
     setEditing(goal);
     setForm({
-      name: goal.name,
+      title: goal.title,
       description: goal.description ?? '',
       targetAmount: String(goal.targetAmount),
       currentAmount: String(goal.currentAmount),
-      targetDate: goal.targetDate ? goal.targetDate.slice(0, 10) : '',
+      deadline: goal.deadline ? goal.deadline.slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
     setShowModal(true);
   };
@@ -66,16 +66,17 @@ export default function GoalContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.targetAmount) return;
+    if (!form.title || !form.targetAmount || !form.deadline) return;
     try {
       setSubmitting(true);
       const payload: CreateGoalDto = {
-        name: form.name,
-        description: form.description || undefined,
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
         targetAmount: Number(form.targetAmount),
-        currentAmount: form.currentAmount ? Number(form.currentAmount) : undefined,
-        targetDate: form.targetDate || undefined,
+        currentAmount: form.currentAmount ? Number(form.currentAmount) : 0,
+        deadline: form.deadline ? new Date(form.deadline).toISOString() : new Date().toISOString(),
       };
+
       if (editing) {
         await GoalApi.update(editing.id, payload as UpdateGoalDto);
       } else {
@@ -141,7 +142,7 @@ export default function GoalContent() {
                 {/* Top */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-foreground truncate">{goal.name}</h3>
+                    <h3 className="font-bold text-foreground truncate">{goal.title}</h3>
                     {goal.description && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">{goal.description}</p>
                     )}
@@ -193,10 +194,10 @@ export default function GoalContent() {
                 </div>
 
                 {/* Target Date */}
-                {goal.targetDate && (
+                {goal.deadline && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="size-3" />
-                    ครบกำหนด {new Date(goal.targetDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    ครบกำหนด {new Date(goal.deadline).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 )}
               </div>
@@ -216,7 +217,7 @@ export default function GoalContent() {
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">ชื่อเป้าหมาย *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="เช่น ซื้อบ้าน"
+                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required placeholder="เช่น ซื้อบ้าน"
                   className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
               <div>
@@ -237,8 +238,8 @@ export default function GoalContent() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">วันครบกำหนด</label>
-                <input type="date" value={form.targetDate} onChange={e => setForm(f => ({ ...f, targetDate: e.target.value }))}
+                <label className="block text-xs font-medium text-muted-foreground mb-1">วันครบกำหนด *</label>
+                <input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} required
                   className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
               <div className="flex gap-3 pt-2">

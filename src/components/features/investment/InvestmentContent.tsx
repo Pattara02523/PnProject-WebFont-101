@@ -11,25 +11,35 @@ import {
 import { PortfolioApi, Portfolio } from '@/lib/api/portfolio.api';
 import { CategoryApi, Category } from '@/lib/api/category.api';
 
-const INVESTMENT_TYPES = [
+const ASSET_TYPES = [
   { value: 'STOCK', label: 'หุ้น' },
+  { value: 'ETF', label: 'ETF' },
   { value: 'FUND', label: 'กองทุน' },
   { value: 'CRYPTO', label: 'คริปโต' },
-  { value: 'ETF', label: 'ETF' },
+  { value: 'GOLD', label: 'ทองคำ' },
   { value: 'BOND', label: 'พันธบัตร' },
-  { value: 'REAL_ESTATE', label: 'อสังหา' },
-  { value: 'OTHER', label: 'อื่นๆ' },
+];
+
+const RISK_LEVELS = [
+  { value: 'LOW', label: 'ต่ำ' },
+  { value: 'MEDIUM', label: 'ปานกลาง' },
+  { value: 'HIGH', label: 'สูง' },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-  STOCK: 'หุ้น', FUND: 'กองทุน', CRYPTO: 'คริปโต',
-  ETF: 'ETF', BOND: 'พันธบัตร', REAL_ESTATE: 'อสังหา', OTHER: 'อื่นๆ',
+  STOCK: 'หุ้น', ETF: 'ETF', FUND: 'กองทุน',
+  CRYPTO: 'คริปโต', GOLD: 'ทองคำ', BOND: 'พันธบัตร',
 };
 
 const emptyForm = {
-  portfolioId: '', categoryId: '', name: '', ticker: '',
-  type: 'STOCK', quantity: '', buyPrice: '', currentPrice: '', boughtAt: '',
+  portfolioId: '', categoryId: '', assetName: '', symbol: '',
+  assetType: 'STOCK' as CreateInvestmentDto['assetType'],
+  purchasePrice: '', currentPrice: '', quantity: '', averageCost: '',
+  riskLevel: 'MEDIUM' as CreateInvestmentDto['riskLevel'],
+  investmentDate: '', note: '',
 };
+
+const fmtNum = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function InvestmentContent() {
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -50,13 +60,13 @@ export default function InvestmentContent() {
       setLoading(true);
       setError(null);
       const [invRes, portRes, catRes] = await Promise.all([
-        InvestmentApi.getAll(),
-        PortfolioApi.getAll(),
-        CategoryApi.getAll(),
+        InvestmentApi.findAll(),
+        PortfolioApi.findAll(),
+        CategoryApi.findAll(),
       ]);
-      setInvestments(invRes.data ?? []);
-      setPortfolios(portRes);
-      setCategories(catRes);
+      setInvestments(invRes || []);
+      setPortfolios(portRes || []);
+      setCategories(catRes || []);
     } catch (e: any) {
       setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
@@ -68,7 +78,12 @@ export default function InvestmentContent() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, portfolioId: portfolios[0]?.id ?? '' });
+    setForm({
+      ...emptyForm,
+      portfolioId: portfolios[0]?.id ?? '',
+      categoryId: categories[0]?.id ?? '',
+      investmentDate: new Date().toISOString().slice(0, 10),
+    });
     setShowModal(true);
   };
 
@@ -76,14 +91,17 @@ export default function InvestmentContent() {
     setEditing(inv);
     setForm({
       portfolioId: inv.portfolioId,
-      categoryId: inv.categoryId ?? '',
-      name: inv.name,
-      ticker: inv.ticker ?? '',
-      type: inv.type,
-      quantity: String(inv.quantity),
-      buyPrice: String(inv.buyPrice),
+      categoryId: inv.categoryId,
+      assetName: inv.assetName,
+      symbol: inv.symbol,
+      assetType: inv.assetType,
+      purchasePrice: String(inv.purchasePrice),
       currentPrice: String(inv.currentPrice),
-      boughtAt: inv.boughtAt ? inv.boughtAt.slice(0, 10) : '',
+      quantity: String(inv.quantity),
+      averageCost: String(inv.averageCost ?? inv.purchasePrice),
+      riskLevel: inv.riskLevel,
+      investmentDate: inv.investmentDate ? inv.investmentDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      note: inv.note ?? '',
     });
     setShowModal(true);
   };
@@ -92,23 +110,26 @@ export default function InvestmentContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.portfolioId || !form.name || !form.type || !form.quantity || !form.buyPrice || !form.currentPrice) return;
+    if (!form.portfolioId || !form.categoryId || !form.assetName || !form.symbol || !form.quantity || !form.purchasePrice || !form.currentPrice) return;
     try {
       setSubmitting(true);
       const payload: CreateInvestmentDto = {
         portfolioId: form.portfolioId,
-        categoryId: form.categoryId || undefined,
-        name: form.name,
-        ticker: form.ticker || undefined,
-        type: form.type as CreateInvestmentDto['type'],
-        quantity: Number(form.quantity),
-        buyPrice: Number(form.buyPrice),
+        categoryId: form.categoryId,
+        assetName: form.assetName.trim(),
+        symbol: form.symbol.trim().toUpperCase(),
+        assetType: form.assetType,
+        purchasePrice: Number(form.purchasePrice),
         currentPrice: Number(form.currentPrice),
-        boughtAt: form.boughtAt || undefined,
+        quantity: Number(form.quantity),
+        averageCost: form.averageCost ? Number(form.averageCost) : Number(form.purchasePrice),
+        riskLevel: form.riskLevel,
+        investmentDate: form.investmentDate ? new Date(form.investmentDate).toISOString() : new Date().toISOString(),
+        note: form.note.trim() || undefined,
       };
+
       if (editing) {
-        const { portfolioId, ...rest } = payload;
-        await InvestmentApi.update(editing.id, rest as UpdateInvestmentDto);
+        await InvestmentApi.update(editing.id, payload as UpdateInvestmentDto);
       } else {
         await InvestmentApi.create(payload);
       }
@@ -132,12 +153,10 @@ export default function InvestmentContent() {
   };
 
   const filtered = investments.filter(inv => {
-    const matchSearch = !search || inv.name.toLowerCase().includes(search.toLowerCase()) || (inv.ticker ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchType = !filterType || inv.type === filterType;
+    const matchSearch = !search || inv.assetName.toLowerCase().includes(search.toLowerCase()) || inv.symbol.toLowerCase().includes(search.toLowerCase());
+    const matchType = !filterType || inv.assetType === filterType;
     return matchSearch && matchType;
   });
-
-  const fmtNum = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
 
@@ -171,7 +190,7 @@ export default function InvestmentContent() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ / ticker..."
+            placeholder="ค้นหาชื่อ / Symbol..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -181,7 +200,7 @@ export default function InvestmentContent() {
           className="px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="">ทุกประเภท</option>
-          {INVESTMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </div>
 
@@ -197,31 +216,33 @@ export default function InvestmentContent() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  {['ชื่อ', 'Portfolio', 'ประเภท', 'จำนวน', 'ราคาซื้อ', 'ราคาปัจจุบัน', 'มูลค่า', 'กำไร/ขาดทุน', 'สถานะ', ''].map(h => (
+                  {['สินทรัพย์', 'Portfolio', 'ประเภท', 'จำนวน', 'ราคาซื้อ', 'ราคาปัจจุบัน', 'มูลค่ารวม', 'กำไร/ขาดทุน', 'สถานะ', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map(inv => {
-                  const gain = inv.gainLoss ?? 0;
-                  const gainPct = inv.gainLossPercent ?? 0;
+                  const currentValue = inv.quantity * inv.currentPrice;
+                  const costValue = inv.quantity * inv.purchasePrice;
+                  const gain = currentValue - costValue;
+                  const gainPct = costValue > 0 ? (gain / costValue) * 100 : 0;
                   return (
                     <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-foreground">{inv.name}</p>
-                        {inv.ticker && <p className="text-xs text-muted-foreground">{inv.ticker}</p>}
+                        <p className="font-semibold text-foreground">{inv.assetName}</p>
+                        <p className="text-xs text-muted-foreground">{inv.symbol}</p>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{inv.portfolio?.name ?? '-'}</td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                          {TYPE_LABEL[inv.type] ?? inv.type}
+                          {TYPE_LABEL[inv.assetType] ?? inv.assetType}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-foreground">{inv.quantity.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.buyPrice)}</td>
+                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.purchasePrice)}</td>
                       <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.currentPrice)}</td>
-                      <td className="px-4 py-3 font-semibold text-foreground">฿{fmtNum(inv.currentValue ?? inv.quantity * inv.currentPrice)}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">฿{fmtNum(currentValue)}</td>
                       <td className="px-4 py-3">
                         <div className={`flex items-center gap-1 font-semibold text-xs ${gain >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                           {gain >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
@@ -263,7 +284,7 @@ export default function InvestmentContent() {
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Portfolio *</label>
                   <select value={form.portfolioId} onChange={e => setForm(f => ({ ...f, portfolioId: e.target.value }))} required
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
@@ -271,29 +292,36 @@ export default function InvestmentContent() {
                     {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">ชื่อการลงทุน *</label>
-                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="เช่น Apple Inc."
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">หมวดหมู่ *</label>
+                  <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} required
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">เลือกหมวดหมู่</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ชื่อสินทรัพย์ *</label>
+                  <input value={form.assetName} onChange={e => setForm(f => ({ ...f, assetName: e.target.value }))} required placeholder="เช่น Apple Inc."
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Ticker (ไม่บังคับ)</label>
-                  <input value={form.ticker} onChange={e => setForm(f => ({ ...f, ticker: e.target.value }))} placeholder="เช่น AAPL"
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Symbol *</label>
+                  <input value={form.symbol} onChange={e => setForm(f => ({ ...f, symbol: e.target.value }))} required placeholder="เช่น AAPL"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">ประเภท *</label>
-                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} required
+                  <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value as any }))} required
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                    {INVESTMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">หมวดหมู่</label>
-                  <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ระดับความเสี่ยง *</label>
+                  <select value={form.riskLevel} onChange={e => setForm(f => ({ ...f, riskLevel: e.target.value as any }))} required
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                    <option value="">ไม่ระบุ</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {RISK_LEVELS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -303,7 +331,7 @@ export default function InvestmentContent() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">ราคาซื้อ (บาท) *</label>
-                  <input type="number" min="0" step="any" value={form.buyPrice} onChange={e => setForm(f => ({ ...f, buyPrice: e.target.value }))} required placeholder="0.00"
+                  <input type="number" min="0" step="any" value={form.purchasePrice} onChange={e => setForm(f => ({ ...f, purchasePrice: e.target.value }))} required placeholder="0.00"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div>
@@ -312,8 +340,13 @@ export default function InvestmentContent() {
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">วันที่ซื้อ</label>
-                  <input type="date" value={form.boughtAt} onChange={e => setForm(f => ({ ...f, boughtAt: e.target.value }))}
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">วันที่ลงทุน *</label>
+                  <input type="date" value={form.investmentDate} onChange={e => setForm(f => ({ ...f, investmentDate: e.target.value }))} required
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">หมายเหตุ</label>
+                  <input value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="หมายเหตุ (ไม่บังคับ)"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
               </div>

@@ -3,33 +3,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Search, ArrowUpRight, ArrowDownRight,
-  DollarSign, PiggyBank, CreditCard, Wallet,
+  DollarSign, PiggyBank, CreditCard,
   Loader2, X, Pencil, Trash2, AlertCircle,
 } from 'lucide-react';
-import { TransactionApi, Transaction, CreateTransactionDto } from '@/lib/api/transaction.api';
-import { PortfolioApi, Portfolio } from '@/lib/api/portfolio.api';
+import { TransactionApi, Transaction, CreateTransactionDto, UpdateTransactionDto } from '@/lib/api/transaction.api';
 import { InvestmentApi, Investment } from '@/lib/api/investment.api';
 
 const TX_TYPES = [
-  { value: 'BUY',        label: 'ซื้อ',        icon: ArrowDownRight, color: 'text-blue-600',    bg: 'bg-blue-500/10' },
-  { value: 'SELL',       label: 'ขาย',          icon: ArrowUpRight,   color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-  { value: 'DIVIDEND',   label: 'เงินปันผล',    icon: DollarSign,     color: 'text-purple-600',  bg: 'bg-purple-500/10' },
-  { value: 'DEPOSIT',    label: 'ฝากเงิน',      icon: PiggyBank,      color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-  { value: 'WITHDRAWAL', label: 'ถอนเงิน',      icon: CreditCard,     color: 'text-red-600',     bg: 'bg-red-500/10' },
-  { value: 'FEE',        label: 'ค่าธรรมเนียม', icon: Wallet,         color: 'text-amber-600',   bg: 'bg-amber-500/10' },
+  { value: 'BUY', label: 'ซื้อ', icon: ArrowDownRight, color: 'text-blue-600', bg: 'bg-blue-500/10' },
+  { value: 'SELL', label: 'ขาย', icon: ArrowUpRight, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
+  { value: 'DIVIDEND', label: 'เงินปันผล', icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-500/10' },
+  { value: 'DEPOSIT', label: 'ฝากเงิน', icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
+  { value: 'WITHDRAW', label: 'ถอนเงิน', icon: CreditCard, color: 'text-red-600', bg: 'bg-red-500/10' },
 ] as const;
 
 const emptyForm = {
-  portfolioId: '', investmentId: '', categoryId: '',
+  investmentId: '',
   type: 'BUY' as CreateTransactionDto['type'],
-  amount: '', quantity: '', price: '', note: '', transactedAt: '',
+  amount: '',
+  quantity: '',
+  price: '',
+  fee: '',
+  tax: '',
+  transactionDate: '',
+  note: '',
 };
 
 const fmtCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function TransactionContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +48,12 @@ export default function TransactionContent() {
     try {
       setLoading(true);
       setError(null);
-      const [txRes, portRes, invRes] = await Promise.all([
-        TransactionApi.getAll(),
-        PortfolioApi.getAll(),
-        InvestmentApi.getAll(),
+      const [txRes, invRes] = await Promise.all([
+        TransactionApi.findAll(),
+        InvestmentApi.findAll(),
       ]);
-      setTransactions(txRes.data ?? []);
-      setPortfolios(portRes);
-      setInvestments(invRes.data ?? []);
+      setTransactions(txRes || []);
+      setInvestments(invRes || []);
     } catch (e: any) {
       setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
@@ -64,22 +65,26 @@ export default function TransactionContent() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, portfolioId: portfolios[0]?.id ?? '' });
+    setForm({
+      ...emptyForm,
+      investmentId: investments[0]?.id ?? '',
+      transactionDate: new Date().toISOString().slice(0, 10),
+    });
     setShowModal(true);
   };
 
   const openEdit = (tx: Transaction) => {
     setEditing(tx);
     setForm({
-      portfolioId: tx.portfolioId,
-      investmentId: tx.investmentId ?? '',
-      categoryId: tx.categoryId ?? '',
+      investmentId: tx.investmentId,
       type: tx.type,
       amount: String(tx.amount),
       quantity: tx.quantity != null ? String(tx.quantity) : '',
       price: tx.price != null ? String(tx.price) : '',
+      fee: tx.fee != null ? String(tx.fee) : '',
+      tax: tx.tax != null ? String(tx.tax) : '',
+      transactionDate: tx.transactionDate ? tx.transactionDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
       note: tx.note ?? '',
-      transactedAt: tx.transactedAt ? tx.transactedAt.slice(0, 10) : '',
     });
     setShowModal(true);
   };
@@ -88,21 +93,23 @@ export default function TransactionContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.investmentId || !form.amount) return;
     try {
       setSubmitting(true);
       const payload: CreateTransactionDto = {
-        portfolioId: form.portfolioId,
-        investmentId: form.investmentId || undefined,
-        categoryId: form.categoryId || undefined,
+        investmentId: form.investmentId,
         type: form.type,
         amount: Number(form.amount),
         quantity: form.quantity ? Number(form.quantity) : undefined,
         price: form.price ? Number(form.price) : undefined,
-        note: form.note || undefined,
-        transactedAt: form.transactedAt || undefined,
+        fee: form.fee ? Number(form.fee) : undefined,
+        tax: form.tax ? Number(form.tax) : undefined,
+        transactionDate: form.transactionDate ? new Date(form.transactionDate).toISOString() : new Date().toISOString(),
+        note: form.note.trim() || undefined,
       };
+
       if (editing) {
-        await TransactionApi.update(editing.id, payload);
+        await TransactionApi.update(editing.id, payload as UpdateTransactionDto);
       } else {
         await TransactionApi.create(payload);
       }
@@ -128,15 +135,15 @@ export default function TransactionContent() {
   const filtered = transactions.filter(tx => {
     const q = search.toLowerCase();
     const matchSearch = !search ||
-      (tx.investment?.name ?? '').toLowerCase().includes(q) ||
-      (tx.note ?? '').toLowerCase().includes(q) ||
-      (tx.portfolio?.name ?? '').toLowerCase().includes(q);
+      (tx.investment?.assetName ?? '').toLowerCase().includes(q) ||
+      (tx.investment?.symbol ?? '').toLowerCase().includes(q) ||
+      (tx.note ?? '').toLowerCase().includes(q);
     const matchType = !filterType || tx.type === filterType;
     return matchSearch && matchType;
   });
 
   const totalIn = transactions.filter(t => ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
-  const totalOut = transactions.filter(t => ['BUY', 'WITHDRAWAL', 'FEE'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
+  const totalOut = transactions.filter(t => ['BUY', 'WITHDRAW'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
 
@@ -158,8 +165,8 @@ export default function TransactionContent() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'เงินเข้า', value: totalIn, color: 'text-emerald-600', icon: ArrowUpRight, bg: 'bg-emerald-500/10' },
-          { label: 'เงินออก', value: totalOut, color: 'text-red-500',     icon: ArrowDownRight, bg: 'bg-red-500/10' },
-          { label: 'รายการทั้งหมด', value: null, count: transactions.length, color: 'text-foreground', icon: Wallet, bg: 'bg-primary/10' },
+          { label: 'เงินออก', value: totalOut, color: 'text-red-500', icon: ArrowDownRight, bg: 'bg-red-500/10' },
+          { label: 'รายการทั้งหมด', value: null, count: transactions.length, color: 'text-foreground', icon: DollarSign, bg: 'bg-primary/10' },
         ].map((s, i) => (
           <div key={i} className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
             <div className={`size-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
@@ -189,7 +196,7 @@ export default function TransactionContent() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
         </div>
-        <div className="flex gap-1 p-1 bg-muted/30 rounded-xl">
+        <div className="flex gap-1 p-1 bg-muted/30 rounded-xl overflow-x-auto">
           <button onClick={() => setFilterType('')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterType ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             ทั้งหมด
@@ -206,7 +213,7 @@ export default function TransactionContent() {
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground text-sm">
-          <Wallet className="size-10 mx-auto mb-3 opacity-30" />
+          <DollarSign className="size-10 mx-auto mb-3 opacity-30" />
           ยังไม่มีรายการ Transaction
         </div>
       ) : (
@@ -215,7 +222,7 @@ export default function TransactionContent() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  {['ประเภท', 'Portfolio', 'สินทรัพย์', 'ราคา/หน่วย', 'จำนวน', 'ยอดรวม', 'วันที่', 'หมายเหตุ', ''].map(h => (
+                  {['ประเภท', 'สินทรัพย์', 'Portfolio', 'ราคา/หน่วย', 'จำนวน', 'ยอดรวม', 'วันที่', 'หมายเหตุ', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -236,15 +243,15 @@ export default function TransactionContent() {
                           <span className="text-xs font-medium text-foreground">{typeInfo?.label ?? tx.type}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.portfolio?.name ?? '-'}</td>
                       <td className="px-4 py-3">
                         {tx.investment ? (
                           <div>
-                            <p className="text-xs font-semibold text-foreground">{tx.investment.name}</p>
-                            {tx.investment.ticker && <p className="text-[10px] text-muted-foreground">{tx.investment.ticker}</p>}
+                            <p className="text-xs font-semibold text-foreground">{tx.investment.assetName}</p>
+                            <p className="text-[10px] text-muted-foreground">{tx.investment.symbol}</p>
                           </div>
                         ) : <span className="text-muted-foreground text-xs">-</span>}
                       </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.investment?.portfolio?.name ?? '-'}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{tx.price != null ? `฿${fmtCurrency(tx.price)}` : '-'}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{tx.quantity != null ? tx.quantity.toLocaleString() : '-'}</td>
                       <td className="px-4 py-3">
@@ -253,7 +260,7 @@ export default function TransactionContent() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {tx.transactedAt ? new Date(tx.transactedAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }) : '-'}
+                        {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }) : '-'}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground max-w-[120px] truncate">{tx.note || '-'}</td>
                       <td className="px-4 py-3">
@@ -284,7 +291,6 @@ export default function TransactionContent() {
               <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="size-4" /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              {/* Type */}
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2">ประเภท *</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -298,20 +304,12 @@ export default function TransactionContent() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Portfolio *</label>
-                  <select value={form.portfolioId} onChange={e => setForm(f => ({ ...f, portfolioId: e.target.value, investmentId: '' }))} required
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">สินทรัพย์การลงทุน *</label>
+                  <select value={form.investmentId} onChange={e => setForm(f => ({ ...f, investmentId: e.target.value }))} required
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                    <option value="">เลือก Portfolio</option>
-                    {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">สินทรัพย์ (ไม่บังคับ)</label>
-                  <select value={form.investmentId} onChange={e => setForm(f => ({ ...f, investmentId: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                    <option value="">ไม่ระบุ</option>
-                    {investments.filter(inv => !form.portfolioId || inv.portfolioId === form.portfolioId).map(inv => (
-                      <option key={inv.id} value={inv.id}>{inv.name}{inv.ticker ? ` (${inv.ticker})` : ''}</option>
+                    <option value="">เลือกสินทรัพย์</option>
+                    {investments.map(inv => (
+                      <option key={inv.id} value={inv.id}>{inv.assetName} ({inv.symbol})</option>
                     ))}
                   </select>
                 </div>
@@ -331,8 +329,8 @@ export default function TransactionContent() {
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">วันที่</label>
-                  <input type="date" value={form.transactedAt} onChange={e => setForm(f => ({ ...f, transactedAt: e.target.value }))}
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">วันที่ *</label>
+                  <input type="date" value={form.transactionDate} onChange={e => setForm(f => ({ ...f, transactionDate: e.target.value }))} required
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
                 <div className="col-span-2">
