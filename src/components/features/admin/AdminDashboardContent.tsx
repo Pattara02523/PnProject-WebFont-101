@@ -1,115 +1,162 @@
 "use client";
 
-import { Users, CreditCard, TrendingUp, DollarSign, UserCheck, AlertCircle } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useEffect, useState } from 'react';
+import { Users, UserCheck, Briefcase, TrendingUp, ArrowLeftRight, Megaphone, Loader2 } from 'lucide-react';
 import { StatCard, Card, Badge, Table, Tr, Td, Avatar } from '@/components/ui';
-import { mockAdminUsers, mockAdminPayments, formatCurrency } from '@/lib/mock-data';
-
-const revenueData = [
-  { month: 'ม.ค.', revenue: 12500 }, { month: 'ก.พ.', revenue: 18900 }, { month: 'มี.ค.', revenue: 15200 },
-  { month: 'เม.ย.', revenue: 22400 }, { month: 'พ.ค.', revenue: 31000 }, { month: 'มิ.ย.', revenue: 28700 },
-];
-
-const subData = [
-  { plan: 'Free', count: 4200 }, { plan: 'Basic', count: 2800 }, { plan: 'Go', count: 3900 }, { plan: 'Plus', count: 1100 },
-];
-
-const statusConfig: Record<string, { label: string; variant: any }> = {
-  pending: { label: 'รอตรวจสอบ', variant: 'warning' },
-  approved: { label: 'อนุมัติ', variant: 'success' },
-  rejected: { label: 'ปฏิเสธ', variant: 'danger' },
-};
+import { AdminApi, AdminDashboard, AdminUser } from '@/lib/api/admin.api';
 
 export default function AdminDashboardContent() {
+  const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        const [dash, usersRes] = await Promise.all([
+          AdminApi.getDashboard(),
+          AdminApi.getUsers({ limit: '5', page: '1' }),
+        ]);
+        setDashboard(dash);
+        setUsers(usersRes.data ?? []);
+      } catch (e: any) {
+        setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="size-8 animate-spin text-violet-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64 text-destructive text-sm">
+        {error}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">ยินดีต้อนรับ, Admin 👋</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">ภาพรวมระบบ InvestPro วันนี้</p>
+        <h2 className="text-xl font-bold text-foreground">ยินดีต้อนรับ, Admin 👋</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมระบบ InvestPro</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="ผู้ใช้ทั้งหมด" value="12,047" change="+142" positive icon={<Users className="w-5 h-5" />} color="blue" />
-        <StatCard title="รายได้เดือนนี้" value="฿128,450" change="+18.4%" positive icon={<DollarSign className="w-5 h-5" />} color="emerald" />
-        <StatCard title="Subscription ที่ใช้งาน" value="7,800" change="+5.2%" positive icon={<UserCheck className="w-5 h-5" />} color="purple" />
-        <StatCard title="รอตรวจสอบ" value="3" change="Payment" icon={<AlertCircle className="w-5 h-5" />} color="amber" />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <StatCard
+          title="ผู้ใช้ทั้งหมด"
+          value={String(dashboard?.users?.total ?? 0)}
+          change={`ใช้งาน ${dashboard?.users?.active ?? 0}`}
+          positive
+          icon={<Users className="w-5 h-5" />}
+          color="blue"
+        />
+        <StatCard
+          title="ผู้ใช้ที่ active"
+          value={String(dashboard?.users?.active ?? 0)}
+          change={`ระงับ ${dashboard?.users?.suspended ?? 0}`}
+          positive
+          icon={<UserCheck className="w-5 h-5" />}
+          color="emerald"
+        />
+        <StatCard
+          title="Portfolio ทั้งหมด"
+          value={String(dashboard?.portfolios?.total ?? 0)}
+          icon={<Briefcase className="w-5 h-5" />}
+          color="purple"
+        />
+        <StatCard
+          title="การลงทุน"
+          value={String(dashboard?.investments?.total ?? 0)}
+          change={`active ${dashboard?.investments?.active ?? 0}`}
+          positive
+          icon={<TrendingUp className="w-5 h-5" />}
+          color="amber"
+        />
+        <StatCard
+          title="Transaction"
+          value={String(dashboard?.transactions?.total ?? 0)}
+          icon={<ArrowLeftRight className="w-5 h-5" />}
+          color="blue"
+        />
       </div>
 
+      {/* Announcements + Users */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-5 lg:col-span-2">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">รายได้รายเดือน</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `฿${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: any) => [formatCurrency(Number(v || 0)), 'รายได้']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#revGrad)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
 
-        <Card className="p-5">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">Subscription แยก Plan</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={subData} layout="vertical" barSize={16}>
-              <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="plan" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={35} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <Bar dataKey="count" fill="#10b981" radius={[0, 6, 6, 0]} name="ผู้ใช้" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">ผู้ใช้ล่าสุด</h3>
+        {/* Announcement summary card */}
+        <Card className="p-5 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Megaphone className="size-4 text-violet-500" />
+            <h3 className="font-semibold text-sm text-foreground">ประกาศ</h3>
           </div>
-          <Table headers={['ผู้ใช้', 'Plan', 'สถานะ', 'เข้าสู่ระบบล่าสุด']}>
-            {mockAdminUsers.slice(0, 5).map(u => (
-              <Tr key={u.id}>
-                <Td>
-                  <div className="flex items-center gap-2">
-                    <Avatar name={u.name} size="sm" />
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{u.name}</p>
-                      <p className="text-xs text-slate-400">{u.email}</p>
-                    </div>
-                  </div>
-                </Td>
-                <Td><Badge variant="neutral">{u.plan}</Badge></Td>
-                <Td><Badge variant={u.status === 'active' ? 'success' : 'danger'}>{u.status === 'active' ? 'ใช้งาน' : 'ระงับ'}</Badge></Td>
-                <Td className="text-xs text-slate-400">{u.lastLogin}</Td>
-              </Tr>
-            ))}
-          </Table>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-muted/40 p-3 text-center">
+              <p className="text-2xl font-bold text-foreground">{dashboard?.announcements?.total ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ทั้งหมด</p>
+            </div>
+            <div className="rounded-xl bg-violet-500/10 p-3 text-center">
+              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{dashboard?.announcements?.published ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">เผยแพร่แล้ว</p>
+            </div>
+          </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">การชำระเงินล่าสุด</h3>
+        {/* Users table */}
+        <Card className="lg:col-span-2">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="font-semibold text-sm text-foreground">ผู้ใช้งานล่าสุด</h3>
           </div>
-          <Table headers={['ผู้ใช้', 'Plan', 'ยอด', 'สถานะ']}>
-            {mockAdminPayments.map(p => (
-              <Tr key={p.id}>
-                <Td>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{p.user}</p>
-                  <p className="text-xs text-slate-400">{p.date}</p>
-                </Td>
-                <Td><Badge variant="neutral">{p.plan}</Badge></Td>
-                <Td className="text-xs font-semibold text-emerald-600">฿{p.amount}</Td>
-                <Td><Badge variant={statusConfig[p.status]?.variant}>{statusConfig[p.status]?.label}</Badge></Td>
-              </Tr>
-            ))}
-          </Table>
+          {users.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-8">ไม่มีข้อมูล</p>
+          ) : (
+            <Table headers={['ผู้ใช้', 'Role', 'สถานะ', 'สร้างเมื่อ']}>
+              {users.map(u => {
+                const name = `${u.firstname} ${u.lastname}`.trim() || u.email;
+                const createdAt = new Date(u.createdAt).toLocaleDateString('th-TH', {
+                  day: '2-digit', month: 'short', year: '2-digit',
+                });
+                return (
+                  <Tr key={u.id}>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={name} size="sm" />
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{name}</p>
+                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                        </div>
+                      </div>
+                    </Td>
+                    <Td>
+                      <Badge variant={u.role === 'ADMIN' ? 'warning' : 'neutral'}>
+                        {u.role}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'}>
+                        {u.status === 'ACTIVE' ? 'ใช้งาน' : u.status === 'SUSPENDED' ? 'ระงับ' : 'ลบแล้ว'}
+                      </Badge>
+                    </Td>
+                    <Td className="text-xs text-muted-foreground">{createdAt}</Td>
+                  </Tr>
+                );
+              })}
+            </Table>
+          )}
         </Card>
+
       </div>
     </div>
   );
