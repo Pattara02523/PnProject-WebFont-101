@@ -231,8 +231,8 @@ export function Table({ headers, children }: TableProps) {
   )
 }
 
-export function Tr({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
-  return <tr className={`border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>{children}</tr>
+export function Tr({ children, onClick, className = '' }: { children: ReactNode; onClick?: () => void; className?: string }) {
+  return <tr className={`border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${onClick ? 'cursor-pointer' : ''} ${className}`} onClick={onClick}>{children}</tr>
 }
 
 export function Td({ children, className = '' }: { children: ReactNode; className?: string }) {

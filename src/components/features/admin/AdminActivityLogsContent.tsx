@@ -1,85 +1,187 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
-import { Search, LogIn, CreditCard, UserPlus, Settings, Shield, Database } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, LogIn, LogOut, UserPlus, Database, Edit, Trash, Settings, Loader2 } from 'lucide-react';
 import { Card, Badge, Pagination } from '@/components/ui';
-import { mockActivityLogs } from '@/lib/mock-data';
+import { AdminApi, ActivityLog } from '@/lib/api/admin.api';
 
-const actionConfig: Record<string, { icon: any; label: string; variant: any; color: string }> = {
-  login: { icon: LogIn, label: 'เข้าสู่ระบบ', variant: 'neutral', color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
-  register: { icon: UserPlus, label: 'สมัครสมาชิก', variant: 'success', color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' },
-  payment: { icon: CreditCard, label: 'การชำระเงิน', variant: 'info', color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
-  crud: { icon: Database, label: 'CRUD', variant: 'neutral', color: 'text-slate-500 bg-slate-100 dark:bg-slate-800' },
-  admin: { icon: Shield, label: 'Admin Action', variant: 'warning', color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' },
+const ACTION_CONFIG: Record<string, { icon: any; label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+  LOGIN: { icon: LogIn, label: 'เข้าสู่ระบบ', variant: 'info' },
+  LOGOUT: { icon: LogOut, label: 'ออกจากระบบ', variant: 'neutral' },
+  REGISTER: { icon: UserPlus, label: 'สมัครสมาชิก', variant: 'success' },
+  CREATE: { icon: Database, label: 'สร้างข้อมูล', variant: 'success' },
+  UPDATE: { icon: Edit, label: 'แก้ไขข้อมูล', variant: 'warning' },
+  DELETE: { icon: Trash, label: 'ลบข้อมูล', variant: 'danger' },
 };
 
 export default function AdminActivityLogsContent() {
-  const [logs] = useState(mockActivityLogs);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [pagination, setPagination] = useState<{ total: number; page: number; limit: number; totalPages: number }>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
   const [filterAction, setFilterAction] = useState('all');
   const [page, setPage] = useState(1);
 
-  const filtered = logs.filter(l => {
-    const userName = `${l.user.firstname} ${l.user.lastname}`;
-    const matchSearch = userName.toLowerCase().includes(search.toLowerCase()) || l.description.toLowerCase().includes(search.toLowerCase());
-    const matchAction = filterAction === 'all' || l.action.toLowerCase() === filterAction.toLowerCase();
-    return matchSearch && matchAction;
-  });
+  const loadLogs = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params: Record<string, string> = {
+        page: String(page),
+        limit: '10',
+      };
+      if (filterAction !== 'all') {
+        params.action = filterAction;
+      }
+
+      const res = await AdminApi.getActivityLogs(params);
+      let data = res.data ?? [];
+
+      // Filter locally by search term if provided
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        data = data.filter((l) => {
+          const userName = `${l.user?.firstname ?? ''} ${l.user?.lastname ?? ''}`.toLowerCase();
+          const desc = (l.description ?? '').toLowerCase();
+          const ip = (l.ipAddress ?? '').toLowerCase();
+          return userName.includes(q) || desc.includes(q) || ip.includes(q);
+        });
+      }
+
+      setLogs(data);
+      setPagination(res.pagination ?? { total: data.length, page, limit: 10, totalPages: Math.ceil(data.length / 10) });
+    } catch (e: any) {
+      setError(e?.message ?? 'โหลดบันทึกกิจกรรมไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filterAction, search]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="size-8 animate-spin text-violet-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <div className="flex-1 flex gap-2">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+      {/* Header Controls */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex-1 flex gap-2 flex-wrap w-full sm:w-auto">
+          <div className="relative flex-1 max-w-xs min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="ค้นหาชื่อผู้ใช้ / กิจกรรม / IP..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+            />
           </div>
-          <select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="all">ทั้งหมด</option>
-            <option value="login">Login</option>
-            <option value="register">Register</option>
-            <option value="payment">Payment</option>
-            <option value="crud">CRUD</option>
-            <option value="admin">Admin</option>
+          <select
+            value={filterAction}
+            onChange={(e) => {
+              setFilterAction(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 rounded-xl border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          >
+            <option value="all">กิจกรรมทั้งหมด</option>
+            <option value="LOGIN">เข้าสู่ระบบ (LOGIN)</option>
+            <option value="LOGOUT">ออกจากระบบ (LOGOUT)</option>
+            <option value="REGISTER">สมัครสมาชิก (REGISTER)</option>
+            <option value="CREATE">สร้างข้อมูล (CREATE)</option>
+            <option value="UPDATE">แก้ไขข้อมูล (UPDATE)</option>
+            <option value="DELETE">ลบข้อมูล (DELETE)</option>
           </select>
         </div>
+        <p className="text-sm text-muted-foreground font-medium">{pagination.total} รายการ</p>
       </div>
 
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm font-medium">
+          {error}
+        </div>
+      )}
+
+      {/* Activity Logs Table */}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-slate-100 dark:border-slate-800">
-              <tr>{['ประเภท', 'ผู้ใช้', 'รายละเอียด', 'IP', 'เวลา'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-              ))}</tr>
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-muted/30">
+              <tr>
+                {['ประเภท', 'ผู้ใช้', 'รายละเอียด', 'IP', 'เวลา'].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
             </thead>
-            <tbody>
-              {filtered.map(log => {
-                const config = actionConfig[log.action.toLowerCase()];
-                const Icon = config?.icon || Settings;
-                return (
-                  <tr key={log.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${config?.color}`}>
-                          <Icon className="w-3.5 h-3.5" />
+            <tbody className="divide-y divide-border">
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-muted-foreground text-sm">
+                    ไม่พบบันทึกกิจกรรม
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => {
+                  const cfg = ACTION_CONFIG[log.action] ?? { icon: Settings, label: log.action, variant: 'neutral' as const };
+                  const Icon = cfg.icon;
+                  const userName = log.user ? `${log.user.firstname} ${log.user.lastname}`.trim() : 'System / User';
+                  const createdAtFormatted = log.createdAt
+                    ? new Date(log.createdAt).toLocaleString('th-TH', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })
+                    : '-';
+
+                  return (
+                    <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-muted shrink-0 text-foreground">
+                            <Icon className="size-3.5" />
+                          </div>
+                          <Badge variant={cfg.variant}>{cfg.label}</Badge>
                         </div>
-                        <Badge variant={config?.variant}>{config?.label || log.action}</Badge>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{log.user.firstname} {log.user.lastname}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{log.description}</td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-400">{log.ipAddress}</td>
-                    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleString('th-TH')}</td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{userName}</td>
+                      <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{log.description || `${log.action} in ${log.module}`}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">{log.ipAddress || '-'}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{createdAtFormatted}</td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <p className="text-xs text-slate-400">{filtered.length} รายการ</p>
-          <Pagination current={page} total={Math.max(1, Math.ceil(filtered.length / 10))} onChange={setPage} />
+
+        {/* Pagination Footer */}
+        <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{pagination.total} รายการ (แสดง 10 รายการต่อหน้า)</p>
+          <Pagination current={page} total={Math.max(1, pagination.totalPages)} onChange={setPage} />
         </div>
       </Card>
     </div>
