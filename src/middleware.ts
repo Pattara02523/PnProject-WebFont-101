@@ -24,7 +24,14 @@ const protectedRoutes = [
 const guestRoutes = ['/login', '/register', '/forgot-password'];
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get(AUTH_TOKEN_KEY)?.value;
+  const rawToken = request.cookies.get(AUTH_TOKEN_KEY)?.value;
+  const token =
+    rawToken &&
+    rawToken !== 'undefined' &&
+    rawToken !== 'null' &&
+    rawToken.trim() !== ''
+      ? rawToken
+      : undefined;
   const { pathname } = request.nextUrl;
 
   // Check if it's a protected route (prefix match)
