@@ -1,344 +1,348 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, Trash2, TrendingUp, TrendingDown, ChevronRight, Loader2 } from 'lucide-react';
-import { Card, Button, Badge, Modal, EmptyState, ConfirmDialog, Pagination } from '@/components/ui/index';
-import { InvestmentApi, Investment, CreateInvestmentDto } from '@/lib/api/investment.api';
-import { PortfolioApi } from '@/lib/api/portfolio.api';
-import { CategoryApi } from '@/lib/api/category.api';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Plus, Search, TrendingUp, TrendingDown,
+  Loader2, X, Pencil, Trash2, AlertCircle,
+} from 'lucide-react';
+import {
+  InvestmentApi, Investment, CreateInvestmentDto, UpdateInvestmentDto,
+} from '@/lib/api/investment.api';
+import { PortfolioApi, Portfolio } from '@/lib/api/portfolio.api';
+import { CategoryApi, Category } from '@/lib/api/category.api';
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
-const formatPercent = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+const INVESTMENT_TYPES = [
+  { value: 'STOCK', label: 'หุ้น' },
+  { value: 'FUND', label: 'กองทุน' },
+  { value: 'CRYPTO', label: 'คริปโต' },
+  { value: 'ETF', label: 'ETF' },
+  { value: 'BOND', label: 'พันธบัตร' },
+  { value: 'REAL_ESTATE', label: 'อสังหา' },
+  { value: 'OTHER', label: 'อื่นๆ' },
+];
 
-const riskColors: Record<string, string> = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' };
-const riskLabels: Record<string, string> = { LOW: 'ต่ำ', MEDIUM: 'ปานกลาง', HIGH: 'สูง' };
-const typeLabels: Record<string, string> = { STOCK: 'หุ้น', ETF: 'ETF', FUND: 'กองทุน', CRYPTO: 'คริปโต', GOLD: 'ทอง', BOND: 'ตราสารหนี้' };
+const TYPE_LABEL: Record<string, string> = {
+  STOCK: 'หุ้น', FUND: 'กองทุน', CRYPTO: 'คริปโต',
+  ETF: 'ETF', BOND: 'พันธบัตร', REAL_ESTATE: 'อสังหา', OTHER: 'อื่นๆ',
+};
 
-const EMPTY_FORM: CreateInvestmentDto = {
-  portfolioId: '',
-  categoryId: '',
-  assetName: '',
-  symbol: '',
-  assetType: 'STOCK',
-  purchasePrice: 0,
-  currentPrice: 0,
-  quantity: 0,
-  averageCost: 0,
-  riskLevel: 'MEDIUM',
-  investmentDate: '',
+const emptyForm = {
+  portfolioId: '', categoryId: '', name: '', ticker: '',
+  type: 'STOCK', quantity: '', buyPrice: '', currentPrice: '', boughtAt: '',
 };
 
 export default function InvestmentContent() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
-  const { data: investments = [], isLoading } = useQuery({
-    queryKey: ['investments'],
-    queryFn: () => InvestmentApi.findAll(),
-    retry: false,
-  });
-
-  const { data: portfolios = [] } = useQuery({
-    queryKey: ['portfolios'],
-    queryFn: () => PortfolioApi.findAll(),
-    retry: false,
-  });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => CategoryApi.findAll(),
-    retry: false,
-  });
-
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterRisk, setFilterRisk] = useState('all');
-  const [page, setPage] = useState(1);
-  const [showForm, setShowForm] = useState(false);
-  const [editItem, setEditItem] = useState<Investment | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateInvestmentDto>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
+  const [filterType, setFilterType] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Investment | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ ...emptyForm });
 
-  const filtered = investments.filter(inv => {
-    const matchSearch =
-      inv.assetName.toLowerCase().includes(search.toLowerCase()) ||
-      inv.symbol.toLowerCase().includes(search.toLowerCase());
-    const matchType = filterType === 'all' || inv.assetType === filterType;
-    const matchRisk = filterRisk === 'all' || inv.riskLevel === filterRisk;
-    return matchSearch && matchType && matchRisk;
-  });
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [invRes, portRes, catRes] = await Promise.all([
+        InvestmentApi.getAll(),
+        PortfolioApi.getAll(),
+        CategoryApi.getAll(),
+      ]);
+      setInvestments(invRes.data ?? []);
+      setPortfolios(portRes);
+      setCategories(catRes);
+    } catch (e: any) {
+      setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const perPage = 10;
-  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+  useEffect(() => { load(); }, [load]);
 
   const openCreate = () => {
-    setForm({ ...EMPTY_FORM, portfolioId: portfolios[0]?.id ?? '', categoryId: categories[0]?.id ?? '' });
-    setEditItem(null);
-    setShowForm(true);
+    setEditing(null);
+    setForm({ ...emptyForm, portfolioId: portfolios[0]?.id ?? '' });
+    setShowModal(true);
   };
 
   const openEdit = (inv: Investment) => {
+    setEditing(inv);
     setForm({
       portfolioId: inv.portfolioId,
-      categoryId: inv.categoryId,
-      assetName: inv.assetName,
-      symbol: inv.symbol,
-      assetType: inv.assetType,
-      purchasePrice: inv.purchasePrice,
-      currentPrice: inv.currentPrice,
-      quantity: inv.quantity,
-      averageCost: inv.averageCost,
-      riskLevel: inv.riskLevel,
-      investmentDate: inv.investmentDate?.split('T')[0] ?? '',
-      note: inv.note,
+      categoryId: inv.categoryId ?? '',
+      name: inv.name,
+      ticker: inv.ticker ?? '',
+      type: inv.type,
+      quantity: String(inv.quantity),
+      buyPrice: String(inv.buyPrice),
+      currentPrice: String(inv.currentPrice),
+      boughtAt: inv.boughtAt ? inv.boughtAt.slice(0, 10) : '',
     });
-    setEditItem(inv);
-    setShowForm(true);
+    setShowModal(true);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const closeModal = () => { setShowModal(false); setEditing(null); setForm({ ...emptyForm }); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.portfolioId || !form.name || !form.type || !form.quantity || !form.buyPrice || !form.currentPrice) return;
     try {
-      if (editItem) {
-        await InvestmentApi.update(editItem.id, form);
+      setSubmitting(true);
+      const payload: CreateInvestmentDto = {
+        portfolioId: form.portfolioId,
+        categoryId: form.categoryId || undefined,
+        name: form.name,
+        ticker: form.ticker || undefined,
+        type: form.type as CreateInvestmentDto['type'],
+        quantity: Number(form.quantity),
+        buyPrice: Number(form.buyPrice),
+        currentPrice: Number(form.currentPrice),
+        boughtAt: form.boughtAt || undefined,
+      };
+      if (editing) {
+        const { portfolioId, ...rest } = payload;
+        await InvestmentApi.update(editing.id, rest as UpdateInvestmentDto);
       } else {
-        await InvestmentApi.create(form);
+        await InvestmentApi.create(payload);
       }
-      queryClient.invalidateQueries({ queryKey: ['investments'] });
-      setShowForm(false);
-    } catch (err) {
-      console.error('Save failed:', err);
+      await load();
+      closeModal();
+    } catch (e: any) {
+      setError(e?.message ?? 'บันทึกไม่สำเร็จ');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = async (id: string) => {
     try {
-      await InvestmentApi.delete(deleteId);
-      queryClient.invalidateQueries({ queryKey: ['investments'] });
-    } catch (err) {
-      console.error('Delete failed:', err);
+      await InvestmentApi.delete(id);
+      setDeleteConfirm(null);
+      await load();
+    } catch (e: any) {
+      setError(e?.message ?? 'ลบไม่สำเร็จ');
     }
-    setDeleteId(null);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-      </div>
-    );
-  }
+  const filtered = investments.filter(inv => {
+    const matchSearch = !search || inv.name.toLowerCase().includes(search.toLowerCase()) || (inv.ticker ?? '').toLowerCase().includes(search.toLowerCase());
+    const matchType = !filterType || inv.type === filterType;
+    return matchSearch && matchType;
+  });
+
+  const fmtNum = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
 
   return (
-    <>
-      <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="flex-1 flex gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="ค้นหาสินทรัพย์..."
-                className="pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <select
-              value={filterType}
-              onChange={e => setFilterType(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="all">ทุกประเภท</option>
-              <option value="STOCK">หุ้น</option>
-              <option value="ETF">ETF</option>
-              <option value="FUND">กองทุน</option>
-              <option value="CRYPTO">คริปโต</option>
-              <option value="GOLD">ทอง</option>
-              <option value="BOND">ตราสารหนี้</option>
-            </select>
-            <select
-              value={filterRisk}
-              onChange={e => setFilterRisk(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="all">ทุก Risk</option>
-              <option value="LOW">ต่ำ</option>
-              <option value="MEDIUM">ปานกลาง</option>
-              <option value="HIGH">สูง</option>
-            </select>
-          </div>
-          <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4" /> เพิ่มการลงทุน</Button>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">การลงทุน</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">{investments.length} รายการ</p>
         </div>
-
-        {paged.length === 0 ? (
-          <EmptyState
-            title="ยังไม่มีการลงทุน"
-            description="เพิ่มสินทรัพย์เพื่อเริ่มติดตามการลงทุน"
-            action={<Button onClick={openCreate}><Plus className="w-4 h-4" /> เพิ่มการลงทุน</Button>}
-            icon={<TrendingUp className="w-8 h-8" />}
-          />
-        ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b border-slate-100 dark:border-slate-800">
-                  <tr>
-                    {['สินทรัพย์', 'ประเภท', 'ราคาซื้อ', 'ราคาปัจจุบัน', 'จำนวน', 'กำไร/ขาดทุน', 'ROI', 'Risk', 'วันที่', ''].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.map(inv => {
-                    const profit = (inv.currentPrice - inv.purchasePrice) * inv.quantity;
-                    const roi = inv.purchasePrice > 0 ? ((inv.currentPrice - inv.purchasePrice) / inv.purchasePrice) * 100 : 0;
-                    return (
-                      <tr
-                        key={inv.id}
-                        className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/investment/${inv.id}`)}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
-                              {inv.symbol.slice(0, 2)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{inv.assetName}</p>
-                              <p className="text-xs text-slate-400">{inv.symbol}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3"><Badge variant="neutral">{typeLabels[inv.assetType] ?? inv.assetType}</Badge></td>
-                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{formatCurrency(inv.purchasePrice)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{formatCurrency(inv.currentPrice)}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{inv.quantity.toLocaleString()}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            {profit >= 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
-                            <span className={`text-sm font-semibold ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                              {profit >= 0 ? '+' : ''}{formatCurrency(Math.abs(profit))}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3"><Badge variant={roi >= 0 ? 'success' : 'danger'}>{formatPercent(roi)}</Badge></td>
-                        <td className="px-4 py-3"><Badge variant={riskColors[inv.riskLevel] as any}>{riskLabels[inv.riskLevel]}</Badge></td>
-                        <td className="px-4 py-3 text-xs text-slate-400">{inv.investmentDate?.split('T')[0] ?? '-'}</td>
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <div className="flex gap-1">
-                            <button onClick={e => { e.stopPropagation(); openEdit(inv); }} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><Edit2 className="w-3.5 h-3.5" /></button>
-                            <button onClick={e => { e.stopPropagation(); setDeleteId(inv.id); }} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => router.push(`/investment/${inv.id}`)} className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-500"><ChevronRight className="w-3.5 h-3.5" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <p className="text-xs text-slate-400">{filtered.length} รายการ</p>
-              <Pagination current={page} total={Math.ceil(filtered.length / perPage)} onChange={setPage} />
-            </div>
-          </Card>
-        )}
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all"
+        >
+          <Plus className="size-4" /> เพิ่มการลงทุน
+        </button>
       </div>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={editItem ? 'แก้ไขการลงทุน' : 'เพิ่มการลงทุน'} size="lg">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Portfolio */}
-          <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">พอร์ตโฟลิโอ</label>
-            <select value={form.portfolioId} onChange={e => setForm(f => ({ ...f, portfolioId: e.target.value }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          {/* Category */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">หมวดหมู่</label>
-            <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          {/* Asset Name */}
-          <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">ชื่อสินทรัพย์</label>
-            <input value={form.assetName} onChange={e => setForm(f => ({ ...f, assetName: e.target.value }))} placeholder="Apple Inc." className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          {/* Symbol */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Symbol</label>
-            <input value={form.symbol} onChange={e => setForm(f => ({ ...f, symbol: e.target.value }))} placeholder="AAPL" className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          {/* Asset Type */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">ประเภท</label>
-            <select value={form.assetType} onChange={e => setForm(f => ({ ...f, assetType: e.target.value as any }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option value="STOCK">หุ้น</option>
-              <option value="ETF">ETF</option>
-              <option value="FUND">กองทุน</option>
-              <option value="CRYPTO">คริปโต</option>
-              <option value="GOLD">ทอง</option>
-              <option value="BOND">ตราสารหนี้</option>
-            </select>
-          </div>
-          {/* Risk Level */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">ระดับความเสี่ยง</label>
-            <select value={form.riskLevel} onChange={e => setForm(f => ({ ...f, riskLevel: e.target.value as any }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              <option value="LOW">ต่ำ</option>
-              <option value="MEDIUM">ปานกลาง</option>
-              <option value="HIGH">สูง</option>
-            </select>
-          </div>
-          {/* Numeric Fields */}
-          {([['ราคาซื้อ', 'purchasePrice'], ['ราคาปัจจุบัน', 'currentPrice'], ['จำนวน', 'quantity'], ['ต้นทุนเฉลี่ย', 'averageCost']] as const).map(([label, key]) => (
-            <div key={key} className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
-              <input
-                type="number"
-                value={(form as any)[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: parseFloat(e.target.value) || 0 }))}
-                placeholder="0"
-                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          ))}
-          {/* Date */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">วันที่ลงทุน</label>
-            <input type="date" value={form.investmentDate} onChange={e => setForm(f => ({ ...f, investmentDate: e.target.value }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          {/* Note */}
-          <div className="flex flex-col gap-1.5 col-span-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">หมายเหตุ</label>
-            <input value={form.note ?? ''} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="หมายเหตุ (ไม่บังคับ)" className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div className="col-span-2 flex gap-3 mt-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>ยกเลิก</Button>
-            <Button className="flex-1" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editItem ? 'บันทึก' : 'เพิ่ม')}
-            </Button>
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="size-4 shrink-0" /> {error}
+          <button onClick={() => setError(null)} className="ml-auto"><X className="size-4" /></button>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อ / ticker..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          className="px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          <option value="">ทุกประเภท</option>
+          {INVESTMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground text-sm">
+          <TrendingUp className="size-10 mx-auto mb-3 opacity-30" />
+          ยังไม่มีการลงทุน
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  {['ชื่อ', 'Portfolio', 'ประเภท', 'จำนวน', 'ราคาซื้อ', 'ราคาปัจจุบัน', 'มูลค่า', 'กำไร/ขาดทุน', 'สถานะ', ''].map(h => (
+                    <th key={h} className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filtered.map(inv => {
+                  const gain = inv.gainLoss ?? 0;
+                  const gainPct = inv.gainLossPercent ?? 0;
+                  return (
+                    <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-foreground">{inv.name}</p>
+                        {inv.ticker && <p className="text-xs text-muted-foreground">{inv.ticker}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{inv.portfolio?.name ?? '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          {TYPE_LABEL[inv.type] ?? inv.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{inv.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.buyPrice)}</td>
+                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.currentPrice)}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">฿{fmtNum(inv.currentValue ?? inv.quantity * inv.currentPrice)}</td>
+                      <td className="px-4 py-3">
+                        <div className={`flex items-center gap-1 font-semibold text-xs ${gain >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {gain >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                          {gain >= 0 ? '+' : ''}{fmtNum(gain)}
+                          <span className="opacity-70">({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%)</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                          {inv.status === 'ACTIVE' ? 'Active' : 'Sold'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(inv)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button onClick={() => setDeleteConfirm(inv.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
-      </Modal>
+      )}
 
-      <ConfirmDialog
-        open={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
-        title="ลบการลงทุน?"
-        description="ไม่สามารถกู้คืนได้หลังจากลบแล้ว"
-        danger
-      />
-    </>
+      {/* Modal Create/Edit */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-bold text-foreground">{editing ? 'แก้ไขการลงทุน' : 'เพิ่มการลงทุน'}</h3>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="size-4" /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Portfolio *</label>
+                  <select value={form.portfolioId} onChange={e => setForm(f => ({ ...f, portfolioId: e.target.value }))} required
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">เลือก Portfolio</option>
+                    {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ชื่อการลงทุน *</label>
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="เช่น Apple Inc."
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Ticker (ไม่บังคับ)</label>
+                  <input value={form.ticker} onChange={e => setForm(f => ({ ...f, ticker: e.target.value }))} placeholder="เช่น AAPL"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ประเภท *</label>
+                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} required
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    {INVESTMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">หมวดหมู่</label>
+                  <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">ไม่ระบุ</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">จำนวน *</label>
+                  <input type="number" min="0" step="any" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} required placeholder="0"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ราคาซื้อ (บาท) *</label>
+                  <input type="number" min="0" step="any" value={form.buyPrice} onChange={e => setForm(f => ({ ...f, buyPrice: e.target.value }))} required placeholder="0.00"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ราคาปัจจุบัน (บาท) *</label>
+                  <input type="number" min="0" step="any" value={form.currentPrice} onChange={e => setForm(f => ({ ...f, currentPrice: e.target.value }))} required placeholder="0.00"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">วันที่ซื้อ</label>
+                  <input type="date" value={form.boughtAt} onChange={e => setForm(f => ({ ...f, boughtAt: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={closeModal} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                  {submitting && <Loader2 className="size-4 animate-spin" />}
+                  {editing ? 'บันทึก' : 'เพิ่ม'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-sm p-6 text-center">
+            <Trash2 className="size-10 text-destructive mx-auto mb-3" />
+            <h3 className="font-bold text-foreground mb-1">ยืนยันการลบ</h3>
+            <p className="text-sm text-muted-foreground mb-5">ข้อมูลการลงทุนนี้จะถูกลบถาวร</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 transition-colors">ลบ</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,207 +1,199 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, BarChart3, Download } from 'lucide-react';
-import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Card, Button, Tabs, Badge } from '@/components/ui/index';
-import { mockPortfolioGrowth, mockMonthlyInvestment, mockAllocation, formatCurrency } from '@/lib/mock-data';
+import { useEffect, useState } from 'react';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import { Loader2, TrendingUp, TrendingDown, Briefcase, BarChart3 } from 'lucide-react';
+import { DashboardApi } from '@/lib/api/admin.api';
 
-const roiData = [
-  { month: 'ม.ค.', roi: 2.1 }, { month: 'ก.พ.', roi: 5.8 }, { month: 'มี.ค.', roi: 3.2 },
-  { month: 'เม.ย.', roi: -1.5 }, { month: 'พ.ค.', roi: 8.4 }, { month: 'มิ.ย.', roi: 6.7 },
-  { month: 'ก.ค.', roi: 10.2 }, { month: 'ส.ค.', roi: 9.1 }, { month: 'ก.ย.', roi: 11.5 },
-  { month: 'ต.ค.', roi: 8.9 }, { month: 'พ.ย.', roi: 12.3 }, { month: 'ธ.ค.', roi: 10.15 },
-];
+const TYPE_LABEL: Record<string, string> = {
+  STOCK: 'หุ้น', FUND: 'กองทุน', CRYPTO: 'คริปโต',
+  ETF: 'ETF', BOND: 'พันธบัตร', REAL_ESTATE: 'อสังหา', OTHER: 'อื่นๆ',
+};
 
-const assetPerf = [
-  { name: 'PTTGC', roi: 19.47, value: 78250 },
-  { name: 'KBANK', roi: 12.68, value: 77750 },
-  { name: 'AAPL', roi: 12.91, value: 10275 },
-  { name: 'SPY', roi: 13.78, value: 10240 },
-  { name: 'BTC', roi: -8.33, value: 165000 },
-  { name: 'ETH', roi: -10.53, value: 42500 },
-];
+const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'];
+
+const fmtB = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
+const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 
 export default function AnalyticsContent() {
-  const [period, setPeriod] = useState('12m');
-  const [view, setView] = useState('portfolio');
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await DashboardApi.getSummary();
+        setData(res);
+      } catch (e: any) {
+        setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
+  if (error) return <div className="flex items-center justify-center h-64 text-destructive text-sm">{error}</div>;
+
+  const summary = data?.summary ?? {};
+  const allocation: { assetType: string; totalValue: number; percentage: number }[] = data?.assetAllocation ?? [];
+  const recentTx: any[] = data?.recentTransactions ?? [];
+  const goals = data?.goals ?? {};
+
+  // Pie chart data
+  const pieData = allocation.map((a, i) => ({
+    name: TYPE_LABEL[a.assetType] ?? a.assetType,
+    value: a.totalValue,
+    pct: a.percentage,
+    color: COLORS[i % COLORS.length],
+  }));
+
+  // Recent tx as bar chart
+  const txBarData = recentTx.map(tx => ({
+    name: tx.assetName ?? tx.symbol,
+    amount: tx.amount,
+    type: tx.type,
+  }));
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <Tabs
-          tabs={[{ label: 'Portfolio', value: 'portfolio' }, { label: 'ROI', value: 'roi' }, { label: 'Allocation', value: 'allocation' }, { label: 'Performance', value: 'perf' }]}
-          active={view}
-          onChange={setView}
-        />
-        <div className="flex gap-2">
-          {['3m', '6m', '12m', 'YTD'].map(p => (
-            <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${period === p ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>{p}</button>
-          ))}
-          <Button variant="outline" size="sm"><Download className="w-4 h-4" /> Export</Button>
-        </div>
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Analytics</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมการลงทุนของคุณ</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'มูลค่ารวม', value: '฿1,465,000', change: '+8.2%', positive: true },
-          { label: 'กำไรสุทธิ', value: '฿135,000', change: '+10.2%', positive: true },
-          { label: 'ROI ปีนี้', value: '+10.15%', change: '+2.1%', positive: true },
-          { label: 'ขาดทุนสูงสุด', value: '-฿55,000', change: 'คริปโต', positive: false },
-        ].map(s => (
-          <Card key={s.label} className="p-4">
-            <p className="text-xs text-slate-400 mb-1">{s.label}</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{s.value}</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              {s.positive ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
-              <span className={`text-xs font-medium ${s.positive ? 'text-emerald-600' : 'text-red-500'}`}>{s.change}</span>
+          {
+            label: 'มูลค่ารวม', value: fmtB(summary.totalPortfolioValue ?? 0),
+            icon: Briefcase, color: 'text-primary', bg: 'bg-primary/10',
+          },
+          {
+            label: 'เงินลงทุน', value: fmtB(summary.totalInvestmentAmount ?? 0),
+            icon: BarChart3, color: 'text-blue-600', bg: 'bg-blue-500/10',
+          },
+          {
+            label: 'กำไร/ขาดทุน',
+            value: fmtB(summary.totalProfitLoss ?? 0),
+            sub: fmtPct(summary.totalRoiPercentage ?? 0),
+            icon: (summary.totalProfitLoss ?? 0) >= 0 ? TrendingUp : TrendingDown,
+            color: (summary.totalProfitLoss ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500',
+            bg: (summary.totalProfitLoss ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10',
+          },
+          {
+            label: 'สินทรัพย์ทั้งหมด', value: String(summary.totalAssetsCount ?? 0) + ' รายการ',
+            icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-500/10',
+          },
+        ].map((s, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
+            <div className={`size-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
+              <s.icon className={`size-5 ${s.color}`} />
             </div>
-          </Card>
+            <div>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
+              {s.sub && <p className="text-xs text-muted-foreground">{s.sub}</p>}
+            </div>
+          </div>
         ))}
       </div>
 
-      {view === 'portfolio' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="p-5 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Portfolio Growth</h3>
-                <p className="text-xs text-slate-400">มูลค่าพอร์ตตามเวลา</p>
-              </div>
-              <Badge variant="success">+109.28%</Badge>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={mockPortfolioGrowth}>
-                <defs>
-                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: any) => [formatCurrency(Number(v || 0)), 'มูลค่า']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-                <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} fill="url(#g1)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <Card className="p-5">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">Asset Allocation</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={mockAllocation} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
-                  {mockAllocation.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip formatter={(v: any) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-col gap-2 mt-3">
-              {mockAllocation.map(a => (
-                <div key={a.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: a.color }} />
-                    <span className="text-xs text-slate-600 dark:text-slate-400">{a.name}</span>
-                  </div>
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{a.value}%</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-5 lg:col-span-3">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">รายได้และกำไรรายเดือน</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={mockMonthlyInvestment} barGap={4}>
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: any) => [formatCurrency(Number(v || 0)), '']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="invested" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="ลงทุน" />
-                <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name="กำไร" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-      )}
-
-      {view === 'roi' && (
-        <Card className="p-5">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">ROI รายเดือน (%)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={roiData}>
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-              <Tooltip formatter={(v: any) => [`${v}%`, 'ROI']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <Line type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2.5} dot={{ fill: '#10b981', strokeWidth: 0, r: 4 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {view === 'allocation' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="p-5">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">สัดส่วนสินทรัพย์</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={mockAllocation} cx="50%" cy="50%" outerRadius={110} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name} ${value}%`}>
-                  {mockAllocation.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip formatter={(v: any) => [`${v}%`]} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-          <Card className="p-5">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">รายละเอียดสัดส่วน</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Asset Allocation Pie */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h3 className="font-semibold text-foreground text-sm mb-4">สัดส่วนการลงทุน</h3>
+          {pieData.length === 0 ? (
+            <p className="text-center text-muted-foreground text-sm py-12">ยังไม่มีข้อมูล</p>
+          ) : (
             <div className="flex flex-col gap-4">
-              {mockAllocation.map(a => (
-                <div key={a.name}>
-                  <div className="flex items-center justify-between mb-1.5">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={80} innerRadius={50}>
+                    {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: any) => [`฿${Number(v).toLocaleString('th-TH')}`, 'มูลค่า']} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2">
+                {pieData.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: a.color }} />
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{a.name}</span>
+                      <div className="size-2.5 rounded-full" style={{ background: p.color }} />
+                      <span className="text-muted-foreground">{p.name}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{a.value}%</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-foreground font-medium">฿{p.value.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>
+                      <span className="text-muted-foreground w-12 text-right">{p.pct.toFixed(1)}%</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
-                    <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${a.value}%`, backgroundColor: a.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {view === 'perf' && (
-        <Card className="p-5">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-4">Performance แต่ละสินทรัพย์</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-slate-100 dark:border-slate-800">
-                <tr>{['สินทรัพย์', 'ROI', 'มูลค่า', 'สถานะ'].map(h => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {assetPerf.sort((a, b) => b.roi - a.roi).map(a => (
-                  <tr key={a.name} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{a.name}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {a.roi >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-red-500" />}
-                        <span className={`text-sm font-bold ${a.roi >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{a.roi >= 0 ? '+' : ''}{a.roi.toFixed(2)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{formatCurrency(a.value)}</td>
-                    <td className="px-4 py-3"><Badge variant={a.roi >= 0 ? 'success' : 'danger'}>{a.roi >= 0 ? 'กำไร' : 'ขาดทุน'}</Badge></td>
-                  </tr>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Goals Summary */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h3 className="font-semibold text-foreground text-sm mb-4">สรุปเป้าหมาย</h3>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {[
+              { label: 'ทั้งหมด',       value: goals.totalGoals ?? 0,    color: 'text-foreground' },
+              { label: 'กำลังดำเนินการ', value: goals.inProgressGoals ?? 0, color: 'text-blue-600' },
+              { label: 'สำเร็จแล้ว',    value: goals.completedGoals ?? 0, color: 'text-emerald-600' },
+              { label: 'ยกเลิก',        value: goals.failedGoals ?? 0,    color: 'text-red-500' },
+            ].map((g, i) => (
+              <div key={i} className="rounded-xl bg-muted/30 p-3 text-center">
+                <p className={`text-2xl font-bold ${g.color}`}>{g.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{g.label}</p>
+              </div>
+            ))}
           </div>
-        </Card>
+          {/* Progress bar */}
+          <div>
+            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+              <span>ความคืบหน้าเฉลี่ย</span>
+              <span className="font-semibold text-foreground">{(goals.averageProgressPercentage ?? 0).toFixed(1)}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${goals.averageProgressPercentage ?? 0}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Transactions Bar Chart */}
+      {txBarData.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h3 className="font-semibold text-foreground text-sm mb-4">ธุรกรรมล่าสุด</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={txBarData} barSize={28}>
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                tickFormatter={v => `฿${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(v: any) => [`฿${Number(v).toLocaleString('th-TH')}`, 'ยอดเงิน']}
+                contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }} />
+              <Bar dataKey="amount" fill="#10b981" radius={[6, 6, 0, 0]} name="ยอดเงิน" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-3 space-y-1">
+            {recentTx.map((tx: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{tx.assetName} ({tx.symbol})</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground font-medium">฿{tx.amount.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>
+                  <span className="text-muted-foreground">{tx.type}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

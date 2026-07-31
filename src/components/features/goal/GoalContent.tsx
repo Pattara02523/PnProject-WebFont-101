@@ -1,183 +1,272 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Home, Car, Target, Palmtree } from 'lucide-react';
-import { Card, Button, Modal, EmptyState, ConfirmDialog, Progress } from '@/components/ui/index';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GoalApi, Goal } from '@/lib/api/goal.api';
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Plus, Target, Loader2, X, Pencil, Trash2,
+  AlertCircle, CheckCircle2, Clock, XCircle,
+} from 'lucide-react';
+import { GoalApi, Goal, CreateGoalDto, UpdateGoalDto } from '@/lib/api/goal.api';
 
-const iconMap: Record<string, any> = { Home, Car, Target, Palmtree };
-const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'];
+const STATUS_CONFIG = {
+  IN_PROGRESS: { label: 'กำลังดำเนินการ', icon: Clock,         color: 'text-blue-600',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
+  COMPLETED:   { label: 'สำเร็จแล้ว',     icon: CheckCircle2,   color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  CANCELLED:   { label: 'ยกเลิก',          icon: XCircle,        color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+};
 
-// ─── Helper: เลือก icon จาก title ─────────────────────────────────────
-function guessIcon(title: string): string {
-  if (title.includes('บ้าน')) return 'Home';
-  if (title.includes('รถ')) return 'Car';
-  if (title.includes('เกษียณ')) return 'Palmtree';
-  return 'Target';
-}
-function guessColor(idx: number): string {
-  return COLORS[idx % COLORS.length];
-}
+const emptyForm = {
+  name: '', description: '', targetAmount: '', currentAmount: '', targetDate: '',
+};
+
+const fmtCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function GoalContent() {
-  const queryClient = useQueryClient();
-  
-  const { data: apiGoals = [] } = useQuery({
-    queryKey: ['goals'],
-    queryFn: () => GoalApi.findAll(),
-    retry: false,
-  });
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Goal | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ ...emptyForm });
 
-  const [showForm, setShowForm] = useState(false);
-  const [editItem, setEditItem] = useState<Goal | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', targetAmount: '', currentAmount: '', deadline: '' });
-
-  const goals = apiGoals;
-
-  const openCreate = () => { setForm({ title: '', description: '', targetAmount: '', currentAmount: '', deadline: '' }); setEditItem(null); setShowForm(true); };
-  const openEdit = (g: any) => { setForm({ title: g.title, description: g.description || '', targetAmount: String(g.targetAmount), currentAmount: String(g.currentAmount), deadline: g.deadline?.split('T')[0] || '' }); setEditItem(g); setShowForm(true); };
-
-  const handleSave = async () => {
-    const data: any = {
-      title: form.title,
-      description: form.description,
-      targetAmount: parseFloat(form.targetAmount) || 0,
-      currentAmount: parseFloat(form.currentAmount) || 0,
-      deadline: form.deadline,
-    };
-
-    if (editItem) {
-      try {
-        await GoalApi.update(editItem.id, data);
-        queryClient.invalidateQueries({ queryKey: ['goals'] });
-      } catch (err) {
-        console.warn('API update failed:', err);
-      }
-    } else {
-      try {
-        await GoalApi.create(data);
-        queryClient.invalidateQueries({ queryKey: ['goals'] });
-      } catch (err) {
-        console.warn('API create failed:', err);
-      }
-    }
-    setShowForm(false);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const load = useCallback(async () => {
     try {
-      await GoalApi.delete(deleteId);
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-    } catch (err) {
-      console.warn('API delete failed:', err);
+      setLoading(true);
+      setError(null);
+      const data = await GoalApi.getAll();
+      setGoals(data);
+    } catch (e: any) {
+      setError(e?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+    } finally {
+      setLoading(false);
     }
-    setDeleteId(null);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...emptyForm });
+    setShowModal(true);
   };
 
-  const daysLeft = (deadline: string) => {
-    const diff = new Date(deadline).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  const openEdit = (goal: Goal) => {
+    setEditing(goal);
+    setForm({
+      name: goal.name,
+      description: goal.description ?? '',
+      targetAmount: String(goal.targetAmount),
+      currentAmount: String(goal.currentAmount),
+      targetDate: goal.targetDate ? goal.targetDate.slice(0, 10) : '',
+    });
+    setShowModal(true);
   };
+
+  const closeModal = () => { setShowModal(false); setEditing(null); setForm({ ...emptyForm }); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.targetAmount) return;
+    try {
+      setSubmitting(true);
+      const payload: CreateGoalDto = {
+        name: form.name,
+        description: form.description || undefined,
+        targetAmount: Number(form.targetAmount),
+        currentAmount: form.currentAmount ? Number(form.currentAmount) : undefined,
+        targetDate: form.targetDate || undefined,
+      };
+      if (editing) {
+        await GoalApi.update(editing.id, payload as UpdateGoalDto);
+      } else {
+        await GoalApi.create(payload);
+      }
+      await load();
+      closeModal();
+    } catch (e: any) {
+      setError(e?.message ?? 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await GoalApi.delete(id);
+      setDeleteConfirm(null);
+      await load();
+    } catch (e: any) {
+      setError(e?.message ?? 'ลบไม่สำเร็จ');
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
 
   return (
-    <>
-      <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{goals.length} เป้าหมาย</p>
-          <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4" /> สร้างเป้าหมาย</Button>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">เป้าหมาย</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">{goals.length} เป้าหมาย</p>
         </div>
-
-        {goals.length === 0 ? (
-          <EmptyState title="ยังไม่มีเป้าหมาย" description="สร้างเป้าหมายทางการเงินเพื่อวางแผนการออมและลงทุน" action={<Button onClick={openCreate}><Plus className="w-4 h-4" /> สร้างเป้าหมาย</Button>} icon={<Target className="w-8 h-8" />} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {goals.map((g, idx) => {
-              const iconKey = guessIcon(g.title);
-              const Icon = iconMap[iconKey] || Target;
-              const color = guessColor(idx);
-              const pct = Math.min(100, g.targetAmount > 0 ? (Number(g.currentAmount) / Number(g.targetAmount)) * 100 : 0);
-              const days = daysLeft(g.deadline);
-              const remaining = Math.max(0, Number(g.targetAmount) - Number(g.currentAmount));
-              return (
-                <Card key={g.id} className="p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center animate-fade-in" style={{ backgroundColor: color + '20' }}>
-                        <Icon className="w-6 h-6" style={{ color }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">{g.title}</h3>
-                        <p className="text-xs text-slate-400">{g.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => openEdit(g)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => setDeleteId(g.id)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <div className="flex items-end justify-between mb-1.5">
-                      <span className="text-xs text-slate-400">ความคืบหน้า</span>
-                      <span className="text-lg font-bold" style={{ color }}>{pct.toFixed(1)}%</span>
-                    </div>
-                    <Progress value={pct} max={100} color={color} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-                      <p className="text-xs text-slate-400 mb-0.5">ปัจจุบัน</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatCurrency(Number(g.currentAmount))}</p>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-                      <p className="text-xs text-slate-400 mb-0.5">เป้าหมาย</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatCurrency(Number(g.targetAmount))}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">เหลืออีก <span className="font-semibold text-slate-600 dark:text-slate-300">{formatCurrency(remaining)}</span></span>
-                    <span className={`font-medium ${days < 30 ? 'text-red-500' : days < 90 ? 'text-amber-500' : 'text-slate-400'}`}>
-                      {days > 0 ? `${days} วัน` : 'หมดเวลาแล้ว'}
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+        <button onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all">
+          <Plus className="size-4" /> เพิ่มเป้าหมาย
+        </button>
       </div>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={editItem ? 'แก้ไขเป้าหมาย' : 'สร้างเป้าหมายใหม่'}>
-        <div className="flex flex-col gap-4">
-          {[
-            ['ชื่อเป้าหมาย', 'title', 'text', 'เช่น ซื้อบ้าน, เกษียณ'],
-            ['คำอธิบาย', 'description', 'text', 'รายละเอียด...'],
-            ['จำนวนเงินเป้าหมาย (บาท)', 'targetAmount', 'number', '0'],
-            ['จำนวนเงินปัจจุบัน (บาท)', 'currentAmount', 'number', '0']
-          ].map(([label, key, type, ph]) => (
-            <div key={key} className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
-              <input type={type} value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="size-4 shrink-0" /> {error}
+          <button onClick={() => setError(null)} className="ml-auto"><X className="size-4" /></button>
+        </div>
+      )}
+
+      {goals.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground text-sm">
+          <Target className="size-10 mx-auto mb-3 opacity-30" />
+          ยังไม่มีเป้าหมาย กด "+ เพิ่มเป้าหมาย" เพื่อเริ่มต้น
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {goals.map(goal => {
+            const pct = goal.targetAmount > 0
+              ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)
+              : 0;
+            const cfg = STATUS_CONFIG[goal.status] ?? STATUS_CONFIG.IN_PROGRESS;
+            const remaining = goal.targetAmount - goal.currentAmount;
+            return (
+              <div key={goal.id} className={`rounded-2xl border ${cfg.border} bg-card p-5 flex flex-col gap-4`}>
+                {/* Top */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-foreground truncate">{goal.name}</h3>
+                    {goal.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{goal.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => openEdit(goal)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteConfirm(goal.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${cfg.bg} w-fit`}>
+                  <cfg.icon className={`size-3 ${cfg.color}`} />
+                  <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+                </div>
+
+                {/* Progress */}
+                <div>
+                  <div className="flex justify-between items-end mb-1.5">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">ปัจจุบัน</p>
+                      <p className="text-sm font-bold text-foreground">฿{fmtCurrency(goal.currentAmount)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-muted-foreground">เป้าหมาย</p>
+                      <p className="text-sm font-bold text-foreground">฿{fmtCurrency(goal.targetAmount)}</p>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-emerald-500' : 'bg-primary'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className={`text-xs font-semibold ${pct >= 100 ? 'text-emerald-600' : 'text-primary'}`}>
+                      {pct.toFixed(1)}%
+                    </span>
+                    {remaining > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        เหลืออีก ฿{fmtCurrency(remaining)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Target Date */}
+                {goal.targetDate && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="size-3" />
+                    ครบกำหนด {new Date(goal.targetDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-bold text-foreground">{editing ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมาย'}</h3>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="size-4" /></button>
             </div>
-          ))}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">กำหนดเวลา</label>
-            <input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div className="flex gap-3 mt-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>ยกเลิก</Button>
-            <Button className="flex-1" onClick={handleSave}>{editItem ? 'บันทึก' : 'สร้าง'}</Button>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">ชื่อเป้าหมาย *</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="เช่น ซื้อบ้าน"
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">คำอธิบาย</label>
+                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">เป้าหมาย (บาท) *</label>
+                  <input type="number" min="0" step="any" value={form.targetAmount} onChange={e => setForm(f => ({ ...f, targetAmount: e.target.value }))} required placeholder="0.00"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">ออมแล้ว (บาท)</label>
+                  <input type="number" min="0" step="any" value={form.currentAmount} onChange={e => setForm(f => ({ ...f, currentAmount: e.target.value }))} placeholder="0.00"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">วันครบกำหนด</label>
+                <input type="date" value={form.targetDate} onChange={e => setForm(f => ({ ...f, targetDate: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={closeModal} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                  {submitting && <Loader2 className="size-4 animate-spin" />}
+                  {editing ? 'บันทึก' : 'เพิ่ม'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </Modal>
+      )}
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="ลบเป้าหมาย?" danger />
-    </>
+      {/* Delete Confirm */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-sm p-6 text-center">
+            <Trash2 className="size-10 text-destructive mx-auto mb-3" />
+            <h3 className="font-bold text-foreground mb-1">ยืนยันการลบ</h3>
+            <p className="text-sm text-muted-foreground mb-5">เป้าหมายนี้จะถูกลบถาวร</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 transition-colors">ลบ</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
