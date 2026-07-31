@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, LogIn, LogOut, UserPlus, Database, Edit, Trash, Settings, Loader2 } from 'lucide-react';
+import { Search, LogIn, LogOut, UserPlus, Database, Edit, Trash2, Settings, Loader2, Globe } from 'lucide-react';
 import { Card, Badge, Pagination } from '@/components/ui';
 import { AdminApi, ActivityLog } from '@/lib/api/admin.api';
 
@@ -11,7 +11,7 @@ const ACTION_CONFIG: Record<string, { icon: any; label: string; variant: 'succes
   REGISTER: { icon: UserPlus, label: 'สมัครสมาชิก', variant: 'success' },
   CREATE: { icon: Database, label: 'สร้างข้อมูล', variant: 'success' },
   UPDATE: { icon: Edit, label: 'แก้ไขข้อมูล', variant: 'warning' },
-  DELETE: { icon: Trash, label: 'ลบข้อมูล', variant: 'danger' },
+  DELETE: { icon: Trash2, label: 'ลบข้อมูล', variant: 'danger' },
 };
 
 export default function AdminActivityLogsContent() {
@@ -49,7 +49,7 @@ export default function AdminActivityLogsContent() {
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         data = data.filter((l) => {
-          const userName = `${l.user?.firstname ?? ''} ${l.user?.lastname ?? ''}`.toLowerCase();
+          const userName = `${l.user?.firstname ?? ''} ${l.user?.lastname ?? ''} ${l.user?.email ?? ''}`.toLowerCase();
           const desc = (l.description ?? '').toLowerCase();
           const ip = (l.ipAddress ?? '').toLowerCase();
           return userName.includes(q) || desc.includes(q) || ip.includes(q);
@@ -126,7 +126,7 @@ export default function AdminActivityLogsContent() {
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/30">
               <tr>
-                {['ประเภท', 'ผู้ใช้', 'รายละเอียด', 'IP', 'เวลา'].map((h) => (
+                {['ประเภท', 'ผู้ใช้งาน', 'รายละเอียด', 'IP Address', 'เวลา'].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>
@@ -144,7 +144,10 @@ export default function AdminActivityLogsContent() {
                 logs.map((log) => {
                   const cfg = ACTION_CONFIG[log.action] ?? { icon: Settings, label: log.action, variant: 'neutral' as const };
                   const Icon = cfg.icon;
-                  const userName = log.user ? `${log.user.firstname} ${log.user.lastname}`.trim() : 'System / User';
+                  const fullName = log.user
+                    ? `${log.user.firstname} ${log.user.lastname}`.trim() || log.user.email
+                    : 'System / Guest';
+
                   const createdAtFormatted = log.createdAt
                     ? new Date(log.createdAt).toLocaleString('th-TH', {
                         day: '2-digit',
@@ -158,7 +161,7 @@ export default function AdminActivityLogsContent() {
 
                   return (
                     <tr key={log.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="p-1.5 rounded-lg bg-muted shrink-0 text-foreground">
                             <Icon className="size-3.5" />
@@ -166,9 +169,35 @@ export default function AdminActivityLogsContent() {
                           <Badge variant={cfg.variant}>{cfg.label}</Badge>
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{userName}</td>
-                      <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{log.description || `${log.action} in ${log.module}`}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">{log.ipAddress || '-'}</td>
+
+                      {/* แสดงชื่อ-นามสกุล และ อีเมลจริง ของผู้ใช้ */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {log.user ? (
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">{fullName}</p>
+                            <p className="text-[10px] text-muted-foreground">{log.user.email}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">System / Guest</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                        {log.description || `${log.action} in ${log.module}`}
+                      </td>
+
+                      {/* IP Address แสดงจริงตามที่เก็บได้ใน DB */}
+                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                        {log.ipAddress ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Globe className="size-3 text-muted-foreground/60" />
+                            {log.ipAddress}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">-</span>
+                        )}
+                      </td>
+
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{createdAtFormatted}</td>
                     </tr>
                   );

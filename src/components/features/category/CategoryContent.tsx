@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Edit2, Trash2, Tag, Zap, Building2, Cpu, Home, TrendingUp, Star, Globe, Shield, Target, Loader2, AlertCircle, X } from 'lucide-react';
 import { Card, Button, Modal, EmptyState, ConfirmDialog } from '@/components/ui/index';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CategoryApi, Category, CreateCategoryDto } from '@/lib/api/category.api';
@@ -26,12 +26,14 @@ export default function CategoryContent() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateCategoryDto>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const openCreate = () => { setForm(EMPTY_FORM); setEditItem(null); setShowForm(true); };
   const openEdit = (c: Category) => { setForm({ name: c.name, icon: c.icon ?? 'Tag', color: c.color ?? '#10b981', description: c.description }); setEditItem(c); setShowForm(true); };
 
   const handleSave = async () => {
     setSaving(true);
+    setErrorMessage(null);
     try {
       if (editItem) {
         await CategoryApi.update(editItem.id, form);
@@ -40,8 +42,8 @@ export default function CategoryContent() {
       }
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setShowForm(false);
-    } catch (err) {
-      console.error('Save category failed:', err);
+    } catch (err: any) {
+      setErrorMessage(err?.message ?? 'บันทึกหมวดหมู่ไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
@@ -49,13 +51,18 @@ export default function CategoryContent() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    setErrorMessage(null);
     try {
       await CategoryApi.delete(deleteId);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-    } catch (err) {
+      setDeleteId(null);
+    } catch (err: any) {
       console.error('Delete category failed:', err);
+      // แสดงข้อความแจ้งเตือนเมื่อลบไม่ได้เนื่องจากมีรายการลงทุนใช้งานอยู่
+      const msg = err?.message || 'ไม่สามารถลบหมวดหมู่นี้ได้ เนื่องจากยังมีรายการลงทุนใช้งานอยู่ (Cannot delete category because it is being used by investments.)';
+      setErrorMessage(msg);
+      setDeleteId(null);
     }
-    setDeleteId(null);
   };
 
   if (isLoading) {
@@ -69,6 +76,23 @@ export default function CategoryContent() {
   return (
     <>
       <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+        {/* Banner แสดงแจ้งเตือนกรณีเกิดข้อผิดพลาดในการลบ */}
+        {errorMessage && (
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-destructive/10 border border-destructive/30 text-destructive animate-in fade-in slide-in-from-top-2 duration-200">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">ไม่สามารถลบหมวดหมู่ได้</p>
+              <p className="text-xs opacity-90 mt-0.5 leading-relaxed">{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="p-1 rounded-lg hover:bg-destructive/20 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-500 dark:text-slate-400">{categories.length} หมวดหมู่</p>
           <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4" /> สร้างหมวดหมู่</Button>
@@ -146,7 +170,14 @@ export default function CategoryContent() {
         </div>
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="ลบหมวดหมู่?" description="ข้อมูลในหมวดหมู่นี้จะยังคงอยู่ แต่จะถูกย้ายไปยัง 'ไม่มีหมวดหมู่'" danger />
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="ยืนยันการลบหมวดหมู่?"
+        description="หากหมวดหมู่นี้ยังมีรายการลงทุนใช้งานอยู่ ระบบจะไม่ยินยอมให้ลบเพื่อรักษาความถูกต้องของข้อมูล"
+        danger
+      />
     </>
   );
 }

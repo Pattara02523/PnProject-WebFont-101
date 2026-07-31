@@ -1,15 +1,23 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Users, UserCheck, Briefcase, TrendingUp, ArrowLeftRight, Megaphone, Loader2, Power } from 'lucide-react';
-import { StatCard, Card, Badge, Table, Tr, Td, Avatar } from '@/components/ui';
-import { AdminApi, AdminDashboard, AdminUser, Announcement } from '@/lib/api/admin.api';
+import Link from 'next/link';
+import { Users, UserCheck, Briefcase, TrendingUp, ArrowLeftRight, Megaphone, Loader2, Power, Plus, X } from 'lucide-react';
+import { StatCard, Card, Badge, Table, Tr, Td, Avatar, Modal } from '@/components/ui';
+import { AdminApi, AdminDashboard, AdminUser, Announcement, CreateAnnouncementDto } from '@/lib/api/admin.api';
 
 const TYPE_LABEL: Record<string, string> = {
   NEWS: 'ข่าวสาร',
   MAINTENANCE: 'ระบบ',
   MARKET: 'ตลาด',
   SYSTEM: 'ทั่วไป',
+};
+
+const emptyForm: CreateAnnouncementDto = {
+  title: '',
+  message: '',
+  type: 'NEWS',
+  isPublished: true,
 };
 
 export default function AdminDashboardContent() {
@@ -19,6 +27,11 @@ export default function AdminDashboardContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  // Create Announcement Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [form, setForm] = useState<CreateAnnouncementDto>({ ...emptyForm });
+  const [creating, setCreating] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -48,13 +61,33 @@ export default function AdminDashboardContent() {
       setTogglingId(ann.id);
       const updated = await AdminApi.updateAnnouncement(ann.id, { isPublished: !ann.isPublished });
       setAnnouncements(prev => prev.map(a => a.id === ann.id ? updated : a));
-      // Refresh dashboard summary counts
       const dash = await AdminApi.getDashboard();
       setDashboard(dash);
     } catch (e: any) {
       alert(e?.message ?? 'สลับสถานะประกาศไม่สำเร็จ');
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.title.trim() || !form.message.trim()) return;
+    try {
+      setCreating(true);
+      await AdminApi.createAnnouncement({
+        title: form.title.trim(),
+        message: form.message.trim(),
+        type: form.type,
+        isPublished: form.isPublished,
+      });
+      setShowCreateModal(false);
+      setForm({ ...emptyForm });
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message ?? 'สร้างประกาศไม่สำเร็จ');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -78,9 +111,16 @@ export default function AdminDashboardContent() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">ยินดีต้อนรับ, Admin 👋</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมระบบ InvestPro</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">ยินดีต้อนรับ, Admin 👋</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมระบบ InvestPro</p>
+        </div>
+        <Link href="/admin/announcements">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400 text-xs font-semibold hover:bg-violet-500/20 transition-all cursor-pointer">
+            <Megaphone className="size-3.5" /> จัดการประกาศทั้งหมด →
+          </button>
+        </Link>
       </div>
 
       {/* Stats Cards (ข้อมูลจริงจาก API) */}
@@ -133,7 +173,12 @@ export default function AdminDashboardContent() {
               <Megaphone className="size-4 text-violet-500" />
               <h3 className="font-semibold text-sm text-foreground">ประกาศ</h3>
             </div>
-            <span className="text-xs text-muted-foreground">{announcements.length} ประกาศ</span>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+            >
+              <Plus className="size-3.5" /> สร้างประกาศ
+            </button>
           </div>
 
           {/* Summary counts */}
@@ -245,6 +290,82 @@ export default function AdminDashboardContent() {
         </Card>
 
       </div>
+
+      {/* Modal: Create Announcement */}
+      {showCreateModal && (
+        <Modal open onClose={() => setShowCreateModal(false)} title="สร้างประกาศใหม่">
+          <form onSubmit={handleCreateAnnouncement} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">หัวข้อประกาศ *</label>
+              <input
+                type="text"
+                required
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="ระบุหัวข้อประกาศ..."
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">ประเภทประกาศ *</label>
+              <select
+                value={form.type}
+                onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              >
+                <option value="NEWS">ข่าวสาร (NEWS)</option>
+                <option value="MAINTENANCE">ปรับปรุงระบบ (MAINTENANCE)</option>
+                <option value="MARKET">ตลาดหุ้น (MARKET)</option>
+                <option value="SYSTEM">ทั่วไป / ประกาศระบบ (SYSTEM)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">เนื้อหาประกาศ *</label>
+              <textarea
+                required
+                rows={4}
+                value={form.message}
+                onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+                placeholder="ระบุรายละเอียดข้อความประกาศ..."
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isPublished"
+                checked={form.isPublished}
+                onChange={e => setForm(f => ({ ...f, isPublished: e.target.checked }))}
+                className="rounded border-border text-violet-600 focus:ring-violet-500 cursor-pointer"
+              />
+              <label htmlFor="isPublished" className="text-xs font-medium text-foreground cursor-pointer select-none">
+                เผยแพร่ประกาศทันที (Is Published)
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                disabled={creating}
+                className="flex-1 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {creating && <Loader2 className="size-4 animate-spin" />}
+                สร้างประกาศ
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

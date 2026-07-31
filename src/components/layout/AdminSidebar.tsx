@@ -9,7 +9,8 @@ import {
   Users,
   FileText,
   Activity,
-  Settings,
+  Megaphone,
+  Download,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -20,8 +21,10 @@ import NavigationItem from './NavigationItem';
 
 const ADMIN_NAV_ITEMS = [
   { label: 'Admin Dashboard', icon: LayoutDashboard, href: '/admin' },
+  { label: 'ประกาศระบบ',    icon: Megaphone,       href: '/admin/announcements' },
   { label: 'ผู้ใช้งาน',       icon: Users,           href: '/admin/users' },
   { label: 'รายงาน',          icon: FileText,         href: '/admin/reports' },
+  { label: 'ส่งออกรายงาน',    icon: Download,         href: '/admin/exports' },
   { label: 'Activity Logs',    icon: Activity,         href: '/admin/activity' },
 ] as const;
 

@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Loader2, TrendingUp, TrendingDown, Briefcase, BarChart3 } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Briefcase, BarChart3, Download, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { DashboardApi } from '@/lib/api/admin.api';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -23,6 +23,11 @@ export default function AnalyticsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Export states
+  const [exportTarget, setExportTarget] = useState<'portfolio' | 'transactions'>('portfolio');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
+
   useEffect(() => {
     async function load() {
       try {
@@ -36,6 +41,50 @@ export default function AnalyticsContent() {
     }
     load();
   }, []);
+
+  const handleExport = async (format: 'pdf' | 'csv') => {
+    try {
+      if (format === 'pdf') setDownloadingPdf(true);
+      else setDownloadingCsv(true);
+
+      const Cookies = require('js-cookie');
+      const token = Cookies.get('auth_token');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+      const endpoint = format === 'pdf'
+        ? `${API_URL}/reports/${exportTarget}/pdf`
+        : `${API_URL}/reports/${exportTarget}`;
+
+      const response = await fetch(endpoint, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        let msg = `ดาวน์โหลดไฟล์ ${format.toUpperCase()} ไม่สำเร็จ`;
+        try {
+          const errBody = await response.json();
+          msg = errBody.message || msg;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportTarget}-report-${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.message ?? 'เกิดข้อผิดพลาดในการดาวน์โหลดรายงาน');
+    } finally {
+      setDownloadingPdf(false);
+      setDownloadingCsv(false);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
   if (error) return <div className="flex items-center justify-center h-64 text-destructive text-sm">{error}</div>;
@@ -62,9 +111,53 @@ export default function AnalyticsContent() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Analytics</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมการลงทุนของคุณ</p>
+      {/* Header with Export Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Analytics</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">ภาพรวมและบทวิเคราะห์การลงทุนของคุณ</p>
+        </div>
+
+        {/* Export Buttons */}
+        <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+          {/* Target selector */}
+          <select
+            value={exportTarget}
+            onChange={e => setExportTarget(e.target.value as any)}
+            className="px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+          >
+            <option value="portfolio">พอร์ตการลงทุน (Portfolio)</option>
+            <option value="transactions">รายการธุรกรรม (Transactions)</option>
+          </select>
+
+          {/* Export PDF */}
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={downloadingPdf}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-500/20 transition-all disabled:opacity-60 cursor-pointer"
+          >
+            {downloadingPdf ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <FileText className="size-3.5 text-red-500" />
+            )}
+            ส่งออก PDF
+          </button>
+
+          {/* Export CSV */}
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={downloadingCsv}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all disabled:opacity-60 cursor-pointer"
+          >
+            {downloadingCsv ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-3.5 text-emerald-500" />
+            )}
+            ส่งออก CSV (Excel)
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

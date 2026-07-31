@@ -26,7 +26,7 @@ export type ActivityLog = {
   browser?: string;
   device?: string;
   createdAt: string;
-  user?: { firstname: string; lastname: string };
+  user?: { id?: string; firstname: string; lastname: string; email: string; avatarUrl?: string };
 };
 
 export type AdminDashboard = {

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, Loader2, FileSpreadsheet, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { Download, Loader2, FileSpreadsheet, FileText, ArrowRight } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, Button, Badge } from '@/components/ui';
 import { AdminApi, AdminDashboard } from '@/lib/api/admin.api';
@@ -15,8 +16,6 @@ const planDist = [
 export default function AdminReportsContent() {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [downloadingCsv, setDownloadingCsv] = useState(false);
 
   // Date Now formatted
   const currentDateStr = new Date().toLocaleDateString('th-TH', {
@@ -40,45 +39,6 @@ export default function AdminReportsContent() {
     loadData();
   }, []);
 
-  const handleDownload = async (type: 'pdf' | 'csv') => {
-    const isPdf = type === 'pdf';
-    try {
-      if (isPdf) setDownloadingPdf(true);
-      else setDownloadingCsv(true);
-
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const endpoint = isPdf ? `${API_URL}/reports/portfolio/pdf` : `${API_URL}/reports/portfolio`;
-
-      const response = await fetch(endpoint, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`ไม่สามารถดาวน์โหลดไฟล์ ${type.toUpperCase()} ได้`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = isPdf
-        ? `portfolio-report-${new Date().toISOString().slice(0, 10)}.pdf`
-        : `portfolio-report-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(err?.message ?? 'เกิดข้อผิดพลาดในการดาวน์โหลดรายงาน');
-    } finally {
-      if (isPdf) setDownloadingPdf(false);
-      else setDownloadingCsv(false);
-    }
-  };
-
   const monthlyOverview = [
     { month: 'ม.ค.', portfolios: Math.max(1, Math.round((dashboard?.portfolios?.total ?? 10) * 0.4)), transactions: Math.max(2, Math.round((dashboard?.transactions?.total ?? 20) * 0.3)) },
     { month: 'ก.พ.', portfolios: Math.max(2, Math.round((dashboard?.portfolios?.total ?? 10) * 0.5)), transactions: Math.max(4, Math.round((dashboard?.transactions?.total ?? 20) * 0.45)) },
@@ -98,41 +58,20 @@ export default function AdminReportsContent() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      {/* Date Now & Download Buttons */}
+      {/* Date Now & Link to Export Page */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground font-medium">
-          ข้อมูล ณ วันที่ <span className="text-foreground font-semibold">{currentDateStr}</span>
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={downloadingPdf}
-            onClick={() => handleDownload('pdf')}
-            className="cursor-pointer"
-          >
-            {downloadingPdf ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-1" />
-            ) : (
-              <FileText className="w-4 h-4 mr-1 text-red-500" />
-            )}
-            ส่งออก PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={downloadingCsv}
-            onClick={() => handleDownload('csv')}
-            className="cursor-pointer"
-          >
-            {downloadingCsv ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-1" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4 mr-1 text-emerald-500" />
-            )}
-            ส่งออก Excel (CSV)
-          </Button>
+        <div>
+          <h2 className="text-xl font-bold text-foreground">รายงานและสถิติระบบรวม</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            ภาพรวมรายงานสถิติการใช้งานระบบ ณ วันที่ <span className="text-foreground font-semibold">{currentDateStr}</span>
+          </p>
         </div>
+
+        <Link href="/admin/exports">
+          <Button variant="primary" size="sm" className="cursor-pointer flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold">
+            <Download className="w-4 h-4" /> ไปยังหน้าส่งออกรายงาน <ArrowRight className="w-4 h-4" />
+          </Button>
+        </Link>
       </div>
 
       {/* Summary Cards */}
