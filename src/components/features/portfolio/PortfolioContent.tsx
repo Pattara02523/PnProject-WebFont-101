@@ -45,18 +45,18 @@ export default function PortfolioContent() {
       setError(null);
       const [ports, invsRes] = await Promise.all([
         PortfolioApi.findAll(),
-        InvestmentApi.getAll({ limit: '1000' }).catch(() => ({ data: [] })),
+        InvestmentApi.findAll({ limit: '1000' }).catch(() => []),
       ]);
       
       setPortfolios(ports || []);
 
       // Calculate portfolio values from investments
       const invMap: Record<string, { value: number; cost: number }> = {};
-      (invsRes.data || []).forEach((inv: any) => {
+      (Array.isArray(invsRes) ? invsRes : []).forEach((inv: any) => {
         const pId = inv.portfolioId;
         if (!invMap[pId]) invMap[pId] = { value: 0, cost: 0 };
-        const val = Number(inv.currentValue ?? (inv.quantity * inv.currentPrice));
-        const cost = Number(inv.totalCost ?? (inv.quantity * inv.buyPrice));
+        const val = Number(inv.quantity * inv.currentPrice);
+        const cost = Number(inv.quantity * inv.purchasePrice);
         invMap[pId].value += val;
         invMap[pId].cost += cost;
       });
