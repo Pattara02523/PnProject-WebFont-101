@@ -3,6 +3,14 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { useAuth } from '@/components/providers/AuthContext';
 import { PortfolioApi } from '@/lib/api/portfolio.api';
 import { InvestmentApi } from '@/lib/api/investment.api';
@@ -13,15 +21,13 @@ import {
   Plus,
   Briefcase,
   BarChart3,
-  Download,
   Target,
   ArrowUpRight,
   Sparkles,
-  PieChart,
 } from 'lucide-react';
 
 const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 2 }).format(v);
+  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v);
 
 const typeColors: Record<string, string> = {
   STOCK: '#10b981',
@@ -77,7 +83,6 @@ export default function DashboardContent() {
   );
 
   const dProfit = dTotalValue - dTotalInvested;
-
   const dRoi = dTotalInvested > 0 ? (dProfit / dTotalInvested) * 100 : 0;
 
   const dLoss = investments
@@ -100,6 +105,40 @@ export default function DashboardContent() {
   const userFullName = user
     ? `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim() || user.email
     : 'ผู้ใช้งาน';
+
+  // Dynamic Portfolio Growth timeline (past 6 months)
+  const portfolioGrowthData = useMemo(() => {
+    if (investments.length === 0) return [];
+
+    const now = new Date();
+    const result: { month: string; value: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthLabel = d.toLocaleDateString('th-TH', { month: 'short' });
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+      // Filter investments up to endOfMonth
+      const eligible = investments.filter(
+        (inv) => new Date(inv.investmentDate || inv.createdAt) <= endOfMonth
+      );
+
+      const val = eligible.reduce((sum, inv) => {
+        const isCurrentMonth = i === 0;
+        const price = isCurrentMonth
+          ? Number(inv.currentPrice || inv.purchasePrice)
+          : Number(inv.purchasePrice);
+        return sum + price * Number(inv.quantity || 0);
+      }, 0);
+
+      result.push({
+        month: monthLabel,
+        value: Math.round(val),
+      });
+    }
+
+    return result;
+  }, [investments]);
 
   // Dynamic Asset Allocation calculation
   const assetAllocation = useMemo(() => {
@@ -142,7 +181,7 @@ export default function DashboardContent() {
             <div>
               <div className="flex items-center justify-center sm:justify-start gap-2">
                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                  ยินดีต้อนรับกลับ {userFullName}
+                  ยินดีต้อนรับ คุณ {userFullName}
                 </h1>
                 <span className="text-2xl animate-bounce origin-bottom">
                   👋
@@ -353,7 +392,7 @@ export default function DashboardContent() {
 
       {/* 4. Charts Grid (Line Chart & Donut Chart) */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Line Chart (2/3 width) */}
+        {/* Left: Real Dynamic Portfolio Growth Chart (2/3 width) */}
         <div className="lg:col-span-2 p-5 rounded-2xl border border-border/60 bg-card/65 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -361,7 +400,7 @@ export default function DashboardContent() {
                 การเติบโตของพอร์ต (Portfolio Growth)
               </h3>
               <p className="text-xs text-muted-foreground">
-                ผลประกอบการสะสมตามพอร์ตโฟลิโอของคุณ
+                ผลประกอบการสะสมตามข้อมูลสินทรัพย์การลงทุนจริง
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -372,63 +411,51 @@ export default function DashboardContent() {
             </div>
           </div>
 
-          {/* SVG Line Chart */}
-          <div className="h-60 relative w-full pt-4">
-            {/* Grid Y-Lines */}
-            <div className="absolute inset-y-0 inset-x-2 flex flex-col justify-between pointer-events-none opacity-40">
-              <span className="w-full h-px border-t border-dashed border-border" />
-              <span className="w-full h-px border-t border-dashed border-border" />
-              <span className="w-full h-px border-t border-dashed border-border" />
-              <span className="w-full h-px border-t border-dashed border-border" />
+          {/* Recharts AreaChart (Dynamic Real Data) */}
+          {portfolioGrowthData.length === 0 ? (
+            <div className="h-60 flex flex-col items-center justify-center border border-dashed border-border rounded-xl">
+              <p className="text-xs text-muted-foreground">ยังไม่มีข้อมูลสินทรัพย์ในพอร์ต</p>
+              <p className="text-[11px] text-muted-foreground mt-1">เพิ่มการลงทุนเพื่อเริ่มบันทึกประวัติการเติบโต</p>
             </div>
-
-            {/* Line Chart Draw */}
-            <svg
-              className="w-full h-full"
-              viewBox="0 0 600 200"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-
-              {/* Area path */}
-              <path
-                d="M0,170 C50,150 100,160 150,130 C200,110 250,120 300,90 C350,80 400,90 450,60 C500,50 550,55 600,45 L600,200 L0,200 Z"
-                fill="url(#chartGradient)"
-              />
-
-              {/* Stroke line path */}
-              <path
-                d="M0,170 C50,150 100,160 150,130 C200,110 250,120 300,90 C350,80 400,90 450,60 C500,50 550,55 600,45"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                className="drop-shadow-[0_4px_8px_rgba(16,185,129,0.3)]"
-              />
-
-              {/* Dots */}
-              <circle cx="150" cy="130" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="300" cy="90" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="450" cy="60" r="4.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-              <circle cx="600" cy="45" r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-            </svg>
-          </div>
-
-          {/* X-axis months */}
-          <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground font-semibold select-none border-t border-border pt-3">
-            <span>ม.ค.</span>
-            <span>มี.ค.</span>
-            <span>พ.ค.</span>
-            <span>ก.ค.</span>
-            <span>ก.ย.</span>
-            <span>พ.ย.</span>
-            <span>ธ.ค.</span>
-          </div>
+          ) : (
+            <div className="h-60 relative w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={portfolioGrowthData}>
+                  <defs>
+                    <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `฿${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    formatter={(v: any) => [`฿${Number(v).toLocaleString('th-TH')}`, 'มูลค่าพอร์ต']}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    name="มูลค่าพอร์ต"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    fill="url(#growthGradient)"
+                    activeDot={{ r: 6, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Right: Donut Chart (1/3 width) */}

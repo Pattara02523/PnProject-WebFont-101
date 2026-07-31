@@ -29,7 +29,10 @@ const emptyForm = {
   note: '',
 };
 
-const fmtCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtCurrency = (v: any) => {
+  const n = typeof v === 'number' ? v : Number(v || 0);
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 export default function TransactionContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -142,8 +145,14 @@ export default function TransactionContent() {
     return matchSearch && matchType;
   });
 
-  const totalIn = transactions.filter(t => ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
-  const totalOut = transactions.filter(t => ['BUY', 'WITHDRAW'].includes(t.type)).reduce((s, t) => s + t.amount, 0);
+  // Calculate real totals safely with Number() conversion
+  const totalIn = transactions
+    .filter(t => ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(t.type))
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  const totalOut = transactions
+    .filter(t => ['BUY', 'WITHDRAW'].includes(t.type))
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="size-8 animate-spin text-primary" /></div>;
 
@@ -156,7 +165,7 @@ export default function TransactionContent() {
           <p className="text-sm text-muted-foreground mt-0.5">{transactions.length} รายการ</p>
         </div>
         <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all">
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all cursor-pointer">
           <Plus className="size-4" /> เพิ่มรายการ
         </button>
       </div>
@@ -231,6 +240,11 @@ export default function TransactionContent() {
                 {filtered.map(tx => {
                   const typeInfo = TX_TYPES.find(t => t.value === tx.type);
                   const isIn = ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(tx.type);
+                  const inv = tx.investment ?? investments.find(i => i.id === tx.investmentId);
+                  const assetTitle = inv?.assetName ? `${inv.assetName}` : '-';
+                  const assetSymbol = inv?.symbol ?? '';
+                  const portName = inv?.portfolio?.name ?? '-';
+
                   return (
                     <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
@@ -244,16 +258,16 @@ export default function TransactionContent() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {tx.investment ? (
+                        {inv ? (
                           <div>
-                            <p className="text-xs font-semibold text-foreground">{tx.investment.assetName}</p>
-                            <p className="text-[10px] text-muted-foreground">{tx.investment.symbol}</p>
+                            <p className="text-xs font-semibold text-foreground">{assetTitle}</p>
+                            {assetSymbol && <p className="text-[10px] text-muted-foreground">{assetSymbol}</p>}
                           </div>
                         ) : <span className="text-muted-foreground text-xs">-</span>}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.investment?.portfolio?.name ?? '-'}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{portName}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{tx.price != null ? `฿${fmtCurrency(tx.price)}` : '-'}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.quantity != null ? tx.quantity.toLocaleString() : '-'}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.quantity != null ? Number(tx.quantity).toLocaleString('th-TH') : '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-semibold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
                           {isIn ? '+' : '-'}฿{fmtCurrency(tx.amount)}

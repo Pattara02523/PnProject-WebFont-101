@@ -23,7 +23,6 @@ const ADMIN_NAV_ITEMS = [
   { label: 'ผู้ใช้งาน',       icon: Users,           href: '/admin/users' },
   { label: 'รายงาน',          icon: FileText,         href: '/admin/reports' },
   { label: 'Activity Logs',    icon: Activity,         href: '/admin/activity' },
-  { label: 'ตั้งค่าระบบ',     icon: Settings,         href: '/admin/settings' },
 ] as const;
 
 export default function AdminSidebar() {

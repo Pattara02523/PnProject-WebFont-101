@@ -33,7 +33,6 @@ const SIDEBAR_ITEMS = [
   { label: 'Analytics',  icon: BarChart3,        href: '/analytics' },
   { label: 'แจ้งเตือน', icon: Bell,             href: '/notification' },
   { label: 'โปรไฟล์',   icon: User,             href: '/profile' },
-  { label: 'ตั้งค่า',   icon: Settings,         href: '/settings' },
 ] as const;
 
 export default function Sidebar() {

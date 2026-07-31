@@ -13,7 +13,6 @@ const protectedRoutes = [
   '/category',
   '/notification',
   '/profile',
-  '/settings',
   '/admin',
   '/reports',
   '/investment',
