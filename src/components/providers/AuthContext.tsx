@@ -46,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await AuthApi.login(dto);
       Cookies.set(AUTH_TOKEN_KEY, response.access_token, { expires: 7 }); // expires in 7 days
       setUser(response.user);
-      router.push('/dashboard');
+      // Redirect based on role
+      router.push(response.user.role === 'ADMIN' ? '/admin' : '/dashboard');
     } catch (error) {
       setUser(null);
       throw error;
