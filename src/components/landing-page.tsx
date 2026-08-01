@@ -212,7 +212,7 @@ export function LandingPage() {
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">
-            ติดตาม วิเคราะห์ และบริหารสินทรัพย์ทุกประเภทในที่เดียว พร้อม AI ช่วยวิเคราะห์พอร์ตและแนะนำการลงทุน
+            บริหารจัดการพอร์ตการลงทุนอย่างมืออาชีพ ติดตามภาพรวมสินทรัพย์ สรุปผลตอบแทน และตั้งเป้าหมายทางการเงินได้อย่างแม่นยำและปลอดภัย
           </p>
 
           {/* Hero CTAs */}
@@ -227,7 +227,7 @@ export function LandingPage() {
 
           {/* Subtext info */}
           <p className="text-xs text-muted-foreground/80 tracking-wide">
-            ฟรีตลอดชีพ <span className="mx-2">•</span> ไม่ต้องใช้บัตรเครดิต <span className="mx-2">•</span> ยกเลิกได้ทุกเวลา
+            ใช้งานฟรี 100% <span className="mx-2">•</span> ความปลอดภัยระดับสถาบันการเงิน <span className="mx-2">•</span> ไม่จำกัดจำนวนสินทรัพย์
           </p>
 
         </div>
