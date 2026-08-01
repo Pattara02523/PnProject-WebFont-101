@@ -25,7 +25,7 @@ const emptyForm = {
 export default function PortfolioContent() {
   const router = useRouter();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [investmentsMap, setInvestmentsMap] = useState<Record<string, { value: number; cost: number }>>({});
+  const [investmentsMap, setInvestmentsMap] = useState<Record<string, { value: number; cost: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,15 +50,16 @@ export default function PortfolioContent() {
       
       setPortfolios(ports || []);
 
-      // Calculate portfolio values from investments
-      const invMap: Record<string, { value: number; cost: number }> = {};
+      // Calculate portfolio values and asset count from investments
+      const invMap: Record<string, { value: number; cost: number; count: number }> = {};
       (Array.isArray(invsRes) ? invsRes : []).forEach((inv: any) => {
         const pId = inv.portfolioId;
-        if (!invMap[pId]) invMap[pId] = { value: 0, cost: 0 };
+        if (!invMap[pId]) invMap[pId] = { value: 0, cost: 0, count: 0 };
         const val = Number(inv.quantity * inv.currentPrice);
         const cost = Number(inv.quantity * inv.purchasePrice);
         invMap[pId].value += val;
         invMap[pId].cost += cost;
+        invMap[pId].count += 1;
       });
       setInvestmentsMap(invMap);
     } catch (e: any) {
@@ -132,7 +133,7 @@ export default function PortfolioContent() {
 
   // Convert API portfolios to Card items
   const cardItems: PortfolioItem[] = portfolios.map((p) => {
-    const invData = investmentsMap[p.id] || { value: 0, cost: 0 };
+    const invData = investmentsMap[p.id] || { value: 0, cost: 0, count: 0 };
     const pnl = invData.value - invData.cost;
     const pnlPct = invData.cost > 0 ? (pnl / invData.cost) * 100 : 0;
     const isPositive = pnl >= 0;
@@ -145,7 +146,7 @@ export default function PortfolioContent() {
       change: `${isPositive ? '' : '-'}${Math.abs(pnl).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       changePercent: `${isPositive ? '+' : ''}${pnlPct.toFixed(2)}%`,
       isPositive,
-      assetsCount: p._count?.investments || 0,
+      assetsCount: invData.count ?? p._count?.investments ?? 0,
       createdAt: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '',
       color: p.color || 'green',
     };

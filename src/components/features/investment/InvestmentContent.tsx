@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Search, TrendingUp, TrendingDown,
-  Loader2, X, Pencil, Trash2, AlertCircle,
+  Plus, Search, TrendingUp, TrendingDown, Eye,
+  Loader2, X, Pencil, Trash2, AlertCircle, Calendar, ShieldAlert, FileText, Tag, Briefcase, DollarSign
 } from 'lucide-react';
 import {
   InvestmentApi, Investment, CreateInvestmentDto, UpdateInvestmentDto,
@@ -21,9 +21,9 @@ const ASSET_TYPES = [
 ];
 
 const RISK_LEVELS = [
-  { value: 'LOW', label: 'ต่ำ' },
-  { value: 'MEDIUM', label: 'ปานกลาง' },
-  { value: 'HIGH', label: 'สูง' },
+  { value: 'LOW', label: 'ต่ำ', color: 'text-emerald-500 bg-emerald-500/10' },
+  { value: 'MEDIUM', label: 'ปานกลาง', color: 'text-amber-500 bg-amber-500/10' },
+  { value: 'HIGH', label: 'สูง', color: 'text-red-500 bg-red-500/10' },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
@@ -55,12 +55,18 @@ export default function InvestmentContent() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
+  // Detail Modal States (Fetches GET /investments/:id)
+  const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
+  const [invDetail, setInvDetail] = useState<Investment | null>(null);
+  const [loadingInvDetail, setLoadingInvDetail] = useState(false);
+  const [invDetailError, setInvDetailError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const [invRes, portRes, catRes] = await Promise.all([
-        InvestmentApi.findAll(),
+        InvestmentApi.findAll({ limit: '1000' }),
         PortfolioApi.findAll(),
         CategoryApi.findAll(),
       ]);
@@ -75,6 +81,31 @@ export default function InvestmentContent() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Open Investment Detail Modal & Fetch GET /investments/:id
+  const openDetailModal = async (id: string) => {
+    setSelectedInvId(id);
+    setInvDetail(null);
+    setInvDetailError(null);
+    setLoadingInvDetail(true);
+
+    try {
+      const data = await InvestmentApi.findOne(id);
+      setInvDetail(data);
+    } catch (err: any) {
+      setInvDetailError(err?.message ?? 'ไม่พบรายการลงทุนหรือเกิดข้อผิดพลาดในการโหลดข้อมูล');
+    } finally {
+      setLoadingInvDetail(false);
+    }
+  };
+
+  // Close Investment Detail Modal & Reset state
+  const closeDetailModal = () => {
+    setSelectedInvId(null);
+    setInvDetail(null);
+    setInvDetailError(null);
+    setLoadingInvDetail(false);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -170,7 +201,7 @@ export default function InvestmentContent() {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
         >
           <Plus className="size-4" /> เพิ่มการลงทุน
         </button>
@@ -179,7 +210,7 @@ export default function InvestmentContent() {
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="size-4 shrink-0" /> {error}
-          <button onClick={() => setError(null)} className="ml-auto"><X className="size-4" /></button>
+          <button onClick={() => setError(null)} className="ml-auto cursor-pointer"><X className="size-4" /></button>
         </div>
       )}
 
@@ -223,8 +254,8 @@ export default function InvestmentContent() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map(inv => {
-                  const currentValue = inv.quantity * inv.currentPrice;
-                  const costValue = inv.quantity * inv.purchasePrice;
+                  const currentValue = Number(inv.quantity) * Number(inv.currentPrice);
+                  const costValue = Number(inv.quantity) * Number(inv.purchasePrice);
                   const gain = currentValue - costValue;
                   const gainPct = costValue > 0 ? (gain / costValue) * 100 : 0;
                   return (
@@ -239,9 +270,9 @@ export default function InvestmentContent() {
                           {TYPE_LABEL[inv.assetType] ?? inv.assetType}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-foreground">{inv.quantity.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.purchasePrice)}</td>
-                      <td className="px-4 py-3 text-foreground">฿{fmtNum(inv.currentPrice)}</td>
+                      <td className="px-4 py-3 text-foreground">{Number(inv.quantity).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-foreground">฿{fmtNum(Number(inv.purchasePrice))}</td>
+                      <td className="px-4 py-3 text-foreground">฿{fmtNum(Number(inv.currentPrice))}</td>
                       <td className="px-4 py-3 font-semibold text-foreground">฿{fmtNum(currentValue)}</td>
                       <td className="px-4 py-3">
                         <div className={`flex items-center gap-1 font-semibold text-xs ${gain >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
@@ -257,10 +288,25 @@ export default function InvestmentContent() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => openEdit(inv)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                          <button
+                            onClick={() => openDetailModal(inv.id)}
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            title="ดูรายละเอียด"
+                          >
+                            <Eye className="size-3.5 text-primary" />
+                          </button>
+                          <button
+                            onClick={() => openEdit(inv)}
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            title="แก้ไข"
+                          >
                             <Pencil className="size-3.5" />
                           </button>
-                          <button onClick={() => setDeleteConfirm(inv.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                          <button
+                            onClick={() => setDeleteConfirm(inv.id)}
+                            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                            title="ลบ"
+                          >
                             <Trash2 className="size-3.5" />
                           </button>
                         </div>
@@ -274,13 +320,193 @@ export default function InvestmentContent() {
         </div>
       )}
 
+      {/* Investment Detail Modal (Calls GET /investments/:id) */}
+      {selectedInvId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+              <h3 className="font-bold text-foreground text-base">รายละเอียดการลงทุน (Investment Detail)</h3>
+              <button onClick={closeDetailModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {loadingInvDetail ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="size-8 animate-spin text-primary" />
+                  <p className="text-xs text-muted-foreground font-medium">กำลังดึงข้อมูลรายละเอียดสินทรัพย์...</p>
+                </div>
+              ) : invDetailError ? (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive my-2">
+                  <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">ไม่พบข้อมูลการลงทุน</p>
+                    <p className="text-xs opacity-90 mt-0.5">{invDetailError}</p>
+                  </div>
+                </div>
+              ) : invDetail ? (
+                <div className="flex flex-col gap-5">
+                  {/* Header Asset Card */}
+                  <div className="p-4 rounded-2xl bg-muted/30 border border-border flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-bold text-foreground">{invDetail.assetName}</h4>
+                        <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold uppercase">
+                          {invDetail.symbol}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                        <span>ประเภท: {TYPE_LABEL[invDetail.assetType] ?? invDetail.assetType}</span>
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${invDetail.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                        {invDetail.status === 'ACTIVE' ? 'เปิดใช้งาน (Active)' : 'ขายแล้ว (Sold)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Profit / Loss Financial Summary */}
+                  {(() => {
+                    const currVal = Number(invDetail.quantity) * Number(invDetail.currentPrice);
+                    const costVal = Number(invDetail.quantity) * Number(invDetail.purchasePrice);
+                    const pnl = currVal - costVal;
+                    const pnlPct = costVal > 0 ? (pnl / costVal) * 100 : 0;
+                    const isPositive = pnl >= 0;
+                    return (
+                      <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-card border border-border">
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">มูลค่ารวมปัจจุบัน</p>
+                          <p className="text-base font-bold text-foreground">฿{fmtNum(currVal)}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">ต้นทุนรวม: ฿{fmtNum(costVal)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] text-muted-foreground">กำไร / ขาดทุนสุทธิ</p>
+                          <p className={`text-base font-bold flex items-center justify-end gap-1 ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {isPositive ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
+                            {isPositive ? '+' : ''}฿{fmtNum(pnl)}
+                          </p>
+                          <p className={`text-[10px] font-semibold ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+                            ({isPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Detailed Information Grid */}
+                  <div className="space-y-2 border-t border-border pt-3 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Briefcase className="size-3.5 text-primary" /> พอร์ตการลงทุน (Portfolio)
+                      </span>
+                      <span className="font-semibold text-foreground">{invDetail.portfolio?.name ?? '-'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Tag className="size-3.5 text-primary" /> หมวดหมู่ (Category)
+                      </span>
+                      <span className="font-semibold text-foreground">{invDetail.category?.name ?? '-'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 text-primary" /> จำนวนหน่วย (Quantity)
+                      </span>
+                      <span className="font-semibold text-foreground">{Number(invDetail.quantity).toLocaleString()}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 text-primary" /> ราคาซื้อเริ่มต้น (Purchase Price)
+                      </span>
+                      <span className="font-semibold text-foreground">฿{fmtNum(Number(invDetail.purchasePrice))}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 text-primary" /> ราคาปัจจุบัน (Current Price)
+                      </span>
+                      <span className="font-semibold text-foreground">฿{fmtNum(Number(invDetail.currentPrice))}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <ShieldAlert className="size-3.5 text-primary" /> ระดับความเสี่ยง (Risk Level)
+                      </span>
+                      {(() => {
+                        const r = RISK_LEVELS.find(lvl => lvl.value === invDetail.riskLevel);
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r?.color ?? 'text-foreground'}`}>
+                            {r?.label ?? invDetail.riskLevel}
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-primary" /> วันที่เข้าลงทุน (Investment Date)
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {invDetail.investmentDate ? new Date(invDetail.investmentDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-primary" /> วันที่สร้างรายการ (Created At)
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {invDetail.createdAt ? new Date(invDetail.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-primary" /> วันที่แก้ไขล่าสุด (Updated At)
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {invDetail.updatedAt ? new Date(invDetail.updatedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                      </span>
+                    </div>
+
+                    <div className="py-2">
+                      <span className="text-muted-foreground flex items-center gap-1.5 mb-1">
+                        <FileText className="size-3.5 text-primary" /> หมายเหตุ (Note)
+                      </span>
+                      <p className="p-2.5 rounded-xl bg-muted/40 text-foreground text-xs">
+                        {invDetail.note || 'ไม่มีหมายเหตุเพิ่มเติม'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-2">
+                    <button
+                      onClick={closeDetailModal}
+                      className="w-full py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Create/Edit */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <h3 className="font-bold text-foreground">{editing ? 'แก้ไขการลงทุน' : 'เพิ่มการลงทุน'}</h3>
-              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="size-4" /></button>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer"><X className="size-4" /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -351,8 +577,8 @@ export default function InvestmentContent() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                <button type="button" onClick={closeModal} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer">ยกเลิก</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                   {submitting && <Loader2 className="size-4 animate-spin" />}
                   {editing ? 'บันทึก' : 'เพิ่ม'}
                 </button>
@@ -370,8 +596,8 @@ export default function InvestmentContent() {
             <h3 className="font-bold text-foreground mb-1">ยืนยันการลบ</h3>
             <p className="text-sm text-muted-foreground mb-5">ข้อมูลการลงทุนนี้จะถูกลบถาวร</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">ยกเลิก</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 transition-colors">ลบ</button>
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer">ยกเลิก</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 transition-colors cursor-pointer">ลบ</button>
             </div>
           </div>
         </div>

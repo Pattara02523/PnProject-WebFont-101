@@ -35,7 +35,7 @@ export type CreateTransactionDto = {
   note?: string;
 };
 
-export type UpdateTransactionDto = Partial<CreateTransactionDto>;
+export type UpdateTransactionDto = Partial<Omit<CreateTransactionDto, 'investmentId'>>;
 
 // ─── API Methods ─────────────────────────────────────────────────────
 

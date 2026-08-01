@@ -32,6 +32,10 @@ export const CategoryApi = {
     return apiFetch<Category[]>('/categories', { method: 'GET' });
   },
 
+  async findOne(id: string): Promise<Category> {
+    return apiFetch<Category>(`/categories/${id}`, { method: 'GET' });
+  },
+
   async create(dto: CreateCategoryDto): Promise<Category> {
     return apiFetch<Category>('/categories', { method: 'POST', body: dto });
   },

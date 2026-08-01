@@ -13,6 +13,11 @@ export type AdminUser = {
   status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    portfolios?: number;
+    transactions?: number;
+    goals?: number;
+  };
 };
 
 export type ActivityLog = {

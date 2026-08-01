@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Search, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationApi } from '@/lib/api/notification.api';
@@ -50,18 +50,8 @@ export default function Header() {
         {getPageTitle()}
       </h2>
 
-      {/* Right: Search, Notifications, Theme Switcher */}
+      {/* Right: Notifications, Theme Switcher */}
       <div className="flex items-center gap-4">
-        {/* Search Bar */}
-        <div className="relative hidden sm:block w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="ค้นหา..."
-            className="w-full h-9 pl-9 pr-4 rounded-xl text-sm border border-border bg-muted/40 hover:bg-muted/65 text-foreground placeholder:text-muted-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/60"
-          />
-        </div>
-
         {/* Notifications Icon Button with Real Badge & Link */}
         <Link href="/notification">
           <button

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Search, ArrowUpRight, ArrowDownRight,
-  DollarSign, PiggyBank, CreditCard,
-  Loader2, X, Pencil, Trash2, AlertCircle,
+  Plus, Search, ArrowUpRight, ArrowDownRight, Eye,
+  DollarSign, PiggyBank, CreditCard, Calendar, FileText, Tag, Briefcase, Hash,
+  Loader2, X, Pencil, Trash2, AlertCircle, Percent, Receipt
 } from 'lucide-react';
 import { TransactionApi, Transaction, CreateTransactionDto, UpdateTransactionDto } from '@/lib/api/transaction.api';
 import { InvestmentApi, Investment } from '@/lib/api/investment.api';
@@ -47,13 +47,19 @@ export default function TransactionContent() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
+  // Detail Modal States (Fetches GET /transactions/:id)
+  const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
+  const [txDetail, setTxDetail] = useState<Transaction | null>(null);
+  const [loadingTxDetail, setLoadingTxDetail] = useState(false);
+  const [txDetailError, setTxDetailError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const [txRes, invRes] = await Promise.all([
-        TransactionApi.findAll(),
-        InvestmentApi.findAll(),
+        TransactionApi.findAll({ limit: '1000' }),
+        InvestmentApi.findAll({ limit: '1000' }),
       ]);
       setTransactions(txRes || []);
       setInvestments(invRes || []);
@@ -65,6 +71,31 @@ export default function TransactionContent() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Open Transaction Detail Modal & Fetch GET /transactions/:id
+  const openDetailModal = async (id: string) => {
+    setSelectedTxId(id);
+    setTxDetail(null);
+    setTxDetailError(null);
+    setLoadingTxDetail(true);
+
+    try {
+      const data = await TransactionApi.findOne(id);
+      setTxDetail(data);
+    } catch (err: any) {
+      setTxDetailError(err?.message ?? 'ไม่พบรายการธุรกรรมหรือเกิดข้อผิดพลาดในการโหลดข้อมูล');
+    } finally {
+      setLoadingTxDetail(false);
+    }
+  };
+
+  // Close Transaction Detail Modal & Reset state
+  const closeDetailModal = () => {
+    setSelectedTxId(null);
+    setTxDetail(null);
+    setTxDetailError(null);
+    setLoadingTxDetail(false);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -112,7 +143,8 @@ export default function TransactionContent() {
       };
 
       if (editing) {
-        await TransactionApi.update(editing.id, payload as UpdateTransactionDto);
+        const { investmentId, ...updatePayload } = payload;
+        await TransactionApi.update(editing.id, updatePayload as UpdateTransactionDto);
       } else {
         await TransactionApi.create(payload);
       }
@@ -165,7 +197,7 @@ export default function TransactionContent() {
           <p className="text-sm text-muted-foreground mt-0.5">{transactions.length} รายการ</p>
         </div>
         <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all cursor-pointer">
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all cursor-pointer shadow-xs">
           <Plus className="size-4" /> เพิ่มรายการ
         </button>
       </div>
@@ -194,7 +226,7 @@ export default function TransactionContent() {
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="size-4 shrink-0" /> {error}
-          <button onClick={() => setError(null)} className="ml-auto"><X className="size-4" /></button>
+          <button onClick={() => setError(null)} className="ml-auto cursor-pointer"><X className="size-4" /></button>
         </div>
       )}
 
@@ -279,10 +311,13 @@ export default function TransactionContent() {
                       <td className="px-4 py-3 text-xs text-muted-foreground max-w-[120px] truncate">{tx.note || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => openEdit(tx)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                          <button onClick={() => openDetailModal(tx.id)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer" title="ดูรายละเอียด">
+                            <Eye className="size-3.5 text-primary" />
+                          </button>
+                          <button onClick={() => openEdit(tx)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer" title="แก้ไข">
                             <Pencil className="size-3.5" />
                           </button>
-                          <button onClick={() => setDeleteConfirm(tx.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                          <button onClick={() => setDeleteConfirm(tx.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer" title="ลบ">
                             <Trash2 className="size-3.5" />
                           </button>
                         </div>
@@ -292,6 +327,166 @@ export default function TransactionContent() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Detail Modal (Calls GET /transactions/:id) */}
+      {selectedTxId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+              <h3 className="font-bold text-foreground text-base">รายละเอียดธุรกรรม (Transaction Detail)</h3>
+              <button onClick={closeDetailModal} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {loadingTxDetail ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="size-8 animate-spin text-primary" />
+                  <p className="text-xs text-muted-foreground font-medium">กำลังดึงข้อมูลรายละเอียดธุรกรรม...</p>
+                </div>
+              ) : txDetailError ? (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive my-2">
+                  <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">ไม่พบข้อมูลธุรกรรม</p>
+                    <p className="text-xs opacity-90 mt-0.5">{txDetailError}</p>
+                  </div>
+                </div>
+              ) : txDetail ? (
+                <div className="flex flex-col gap-5">
+                  {/* Header Card */}
+                  {(() => {
+                    const typeInfo = TX_TYPES.find(t => t.value === txDetail.type);
+                    const isIn = ['SELL', 'DIVIDEND', 'DEPOSIT'].includes(txDetail.type);
+                    const inv = txDetail.investment ?? investments.find(i => i.id === txDetail.investmentId);
+                    return (
+                      <div className="p-4 rounded-2xl bg-muted/30 border border-border flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {typeInfo && (
+                            <div className={`size-12 rounded-xl ${typeInfo.bg} flex items-center justify-center shrink-0`}>
+                              <typeInfo.icon className={`size-6 ${typeInfo.color}`} />
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                              {typeInfo?.label ?? txDetail.type}
+                            </span>
+                            <h4 className="text-lg font-bold text-foreground">{inv?.assetName || 'ไม่ระบุสินทรัพย์'}</h4>
+                            {inv?.symbol && <p className="text-xs text-muted-foreground">{inv.symbol}</p>}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">ยอดรวมธุรกรรม</p>
+                          <p className={`text-xl font-extrabold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {isIn ? '+' : '-'}฿{fmtCurrency(txDetail.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Transaction Info Grid */}
+                  <div className="space-y-2 border-t border-border pt-3 text-xs">
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Briefcase className="size-3.5 text-primary" /> Portfolio
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {txDetail.investment?.portfolio?.name ?? investments.find(i => i.id === txDetail.investmentId)?.portfolio?.name ?? '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Tag className="size-3.5 text-primary" /> ประเภทรายการ
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {TX_TYPES.find(t => t.value === txDetail.type)?.label ?? txDetail.type}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 text-primary" /> จำนวนหน่วย (Quantity)
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {txDetail.quantity != null ? Number(txDetail.quantity).toLocaleString() : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 text-primary" /> ราคาต่อหน่วย (Price)
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {txDetail.price != null ? `฿${fmtCurrency(txDetail.price)}` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Receipt className="size-3.5 text-primary" /> ค่าธรรมเนียม (Fee)
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {txDetail.fee != null && Number(txDetail.fee) > 0 ? `฿${fmtCurrency(txDetail.fee)}` : '฿0.00'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Percent className="size-3.5 text-primary" /> ภาษี (Tax)
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {txDetail.tax != null && Number(txDetail.tax) > 0 ? `฿${fmtCurrency(txDetail.tax)}` : '฿0.00'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-primary" /> วันที่ทำรายการ (Transaction Date)
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {txDetail.transactionDate ? new Date(txDetail.transactionDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-border/50">
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="size-3.5 text-primary" /> วันที่บันทึกระบบ (Created At)
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {txDetail.createdAt ? new Date(txDetail.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                      </span>
+                    </div>
+
+                    <div className="py-2">
+                      <span className="text-muted-foreground flex items-center gap-1.5 mb-1">
+                        <FileText className="size-3.5 text-primary" /> หมายเหตุ (Note)
+                      </span>
+                      <p className="p-2.5 rounded-xl bg-muted/40 text-foreground text-xs">
+                        {txDetail.note || 'ไม่มีหมายเหตุเพิ่มเติม'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer Action */}
+                  <div className="pt-2">
+                    <button
+                      onClick={closeDetailModal}
+                      className="w-full py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}

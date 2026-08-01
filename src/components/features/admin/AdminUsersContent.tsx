@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Eye, Trash2, UserX, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Eye, Trash2, UserX, Loader2, AlertCircle, Briefcase, DollarSign, Calendar, Mail, Phone, Shield, UserCheck } from 'lucide-react';
 import { Card, Badge, Avatar, Button, Modal, ConfirmDialog, Pagination } from '@/components/ui';
 import { AdminApi, AdminUser } from '@/lib/api/admin.api';
 
@@ -19,8 +19,13 @@ export default function AdminUsersContent() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [page, setPage] = useState(1);
 
-  // Modals
-  const [viewUser, setViewUser] = useState<AdminUser | null>(null);
+  // Detail Modal States (Fetches GET /admin/users/:id)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userDetail, setUserDetail] = useState<AdminUser | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  // Delete Confirm & Status Action States
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -54,14 +59,39 @@ export default function AdminUsersContent() {
     loadUsers();
   }, [loadUsers]);
 
+  // Open Detail Modal & Fetch GET /admin/users/:id
+  const openDetailModal = async (userId: string) => {
+    setSelectedUserId(userId);
+    setUserDetail(null);
+    setDetailError(null);
+    setLoadingDetail(true);
+
+    try {
+      const data = await AdminApi.getUserById(userId);
+      setUserDetail(data);
+    } catch (err: any) {
+      setDetailError(err?.message ?? 'ไม่สามารถโหลดข้อมูลรายละเอียดผู้ใช้งานได้');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Close Detail Modal & Reset state
+  const closeDetailModal = () => {
+    setSelectedUserId(null);
+    setUserDetail(null);
+    setDetailError(null);
+    setLoadingDetail(false);
+  };
+
   const toggleStatus = async (user: AdminUser) => {
     try {
       setActionLoading(true);
       const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
       await AdminApi.updateUserStatus(user.id, newStatus);
       await loadUsers();
-      if (viewUser && viewUser.id === user.id) {
-        setViewUser(prev => prev ? { ...prev, status: newStatus as any } : null);
+      if (userDetail && userDetail.id === user.id) {
+        setUserDetail(prev => prev ? { ...prev, status: newStatus as any } : null);
       }
     } catch (e: any) {
       alert(e?.message ?? 'เปลี่ยนสถานะผู้ใช้ไม่สำเร็จ');
@@ -174,22 +204,23 @@ export default function AdminUsersContent() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => setViewUser(u)}
-                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                            title="ดูรายละเอียด"
+                            onClick={() => openDetailModal(u.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer shadow-xs"
+                            title="ดูรายละเอียดผู้ใช้"
                           >
-                            <Eye className="size-3.5" />
+                            <Eye className="size-3.5 text-violet-500" />
+                            ดูรายละเอียด
                           </button>
                           <button
                             onClick={() => toggleStatus(u)}
-                            className="p-1.5 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-colors cursor-pointer"
                             title={u.status === 'ACTIVE' ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'}
                           >
                             <UserX className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteId(u.id)}
-                            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                             title="ลบผู้ใช้"
                           >
                             <Trash2 className="size-3.5" />
@@ -211,54 +242,141 @@ export default function AdminUsersContent() {
         </div>
       </Card>
 
-      {/* View User Modal */}
-      {viewUser && (
-        <Modal open onClose={() => setViewUser(null)} title="ข้อมูลผู้ใช้งาน">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <Avatar name={`${viewUser.firstname} ${viewUser.lastname}`} size="lg" />
-              <div>
-                <p className="font-bold text-foreground">{viewUser.firstname} {viewUser.lastname}</p>
-                <p className="text-sm text-muted-foreground">{viewUser.email}</p>
-                <div className="flex gap-2 mt-1">
-                  <Badge variant={viewUser.role === 'ADMIN' ? 'warning' : 'neutral'}>{viewUser.role}</Badge>
-                  <Badge variant={viewUser.status === 'ACTIVE' ? 'success' : 'danger'}>
-                    {viewUser.status === 'ACTIVE' ? 'ใช้งาน' : 'ระงับ'}
-                  </Badge>
-                </div>
+      {/* User Detail Modal (Calls GET /admin/users/:id) */}
+      {selectedUserId && (
+        <Modal open onClose={closeDetailModal} title="รายละเอียดผู้ใช้งาน (User Details)">
+          {loadingDetail ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="size-8 animate-spin text-violet-500" />
+              <p className="text-xs text-muted-foreground font-medium">กำลังดึงข้อมูลรายละเอียดผู้ใช้...</p>
+            </div>
+          ) : detailError ? (
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive my-2">
+              <AlertCircle className="size-5 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold">ไม่สามารถดึงข้อมูลได้</p>
+                <p className="text-xs opacity-90 mt-0.5">{detailError}</p>
               </div>
             </div>
+          ) : userDetail ? (
+            <div className="flex flex-col gap-5">
+              {/* Profile Card Header */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-muted/30 border border-border">
+                {userDetail.avatarUrl ? (
+                  <img
+                    src={userDetail.avatarUrl}
+                    alt="profile"
+                    className="size-14 rounded-2xl object-cover ring-2 ring-violet-500/20"
+                  />
+                ) : (
+                  <Avatar name={`${userDetail.firstname} ${userDetail.lastname}`} size="lg" />
+                )}
 
-            <div className="space-y-2 border-t border-border pt-3">
-              {[
-                ['เบอร์โทรศัพท์', viewUser.phone || '-'],
-                ['วันที่สมัคร', new Date(viewUser.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })],
-                ['อัปเดตล่าสุด', new Date(viewUser.updatedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })],
-              ].map(([l, v]) => (
-                <div key={l} className="flex justify-between text-xs py-1 border-b border-border/50">
-                  <span className="text-muted-foreground">{l}</span>
-                  <span className="font-medium text-foreground">{v}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-foreground text-base truncate">
+                      {userDetail.firstname} {userDetail.lastname}
+                    </h3>
+                    <Badge variant={userDetail.role === 'ADMIN' ? 'warning' : 'neutral'}>
+                      {userDetail.role}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{userDetail.email}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Badge variant={userDetail.status === 'ACTIVE' ? 'success' : 'danger'}>
+                      {userDetail.status === 'ACTIVE' ? 'ใช้งานปกติ (ACTIVE)' : 'ถูกระงับ (SUSPENDED)'}
+                    </Badge>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            <div className="flex gap-2 mt-2">
-              <Button variant="secondary" className="flex-1" onClick={() => setViewUser(null)}>ปิด</Button>
-              <Button
-                variant={viewUser.status === 'ACTIVE' ? 'danger' : 'primary'}
-                className="flex-1"
-                disabled={actionLoading}
-                onClick={() => toggleStatus(viewUser)}
-              >
-                {actionLoading && <Loader2 className="size-4 animate-spin mr-1" />}
-                {viewUser.status === 'ACTIVE' ? 'ระงับบัญชี' : 'เปิดใช้งาน'}
-              </Button>
+              {/* Usage Summary Stats Badges */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl border border-border bg-card flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-500 shrink-0">
+                    <Briefcase className="size-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">จำนวน Portfolio</p>
+                    <p className="text-base font-bold text-foreground">
+                      {userDetail._count?.portfolios ?? 0} พอร์ต
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-border bg-card flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                    <DollarSign className="size-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">จำนวน Transaction</p>
+                    <p className="text-base font-bold text-foreground">
+                      {userDetail._count?.transactions ?? 0} รายการ
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed User Information List */}
+              <div className="space-y-2 border-t border-border pt-4 text-xs">
+                <p className="font-bold text-foreground uppercase tracking-wider text-[11px] mb-2">
+                  ข้อมูลบัญชี (Account Info)
+                </p>
+
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Mail className="size-3.5 text-violet-500" /> อีเมล
+                  </span>
+                  <span className="font-medium text-foreground">{userDetail.email}</span>
+                </div>
+
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Phone className="size-3.5 text-violet-500" /> เบอร์โทรศัพท์
+                  </span>
+                  <span className="font-medium text-foreground">{userDetail.phone || '-'}</span>
+                </div>
+
+                <div className="flex justify-between py-2 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Calendar className="size-3.5 text-violet-500" /> วันที่สมัครเข้าใช้งาน
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {new Date(userDetail.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Shield className="size-3.5 text-violet-500" /> อัปเดตข้อมูลล่าสุด
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {new Date(userDetail.updatedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex gap-3 pt-3 border-t border-border">
+                <Button variant="secondary" className="flex-1 cursor-pointer" onClick={closeDetailModal}>
+                  ปิดหน้าต่าง
+                </Button>
+                <Button
+                  variant={userDetail.status === 'ACTIVE' ? 'danger' : 'primary'}
+                  className="flex-1 cursor-pointer"
+                  disabled={actionLoading}
+                  onClick={() => toggleStatus(userDetail)}
+                >
+                  {actionLoading && <Loader2 className="size-4 animate-spin mr-1" />}
+                  {userDetail.status === 'ACTIVE' ? 'ระงับบัญชีผู้ใช้' : 'เปิดใช้งานบัญชี'}
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </Modal>
       )}
 
-      {/* Confirm Dialog */}
+      {/* Confirm Delete Dialog */}
       <ConfirmDialog
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
