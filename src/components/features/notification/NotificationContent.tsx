@@ -57,7 +57,10 @@ export default function NotificationContent() {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
       }
       if (n.link) {
-        let target = n.link.startsWith('/goals') ? n.link.replace('/goals', '/goal') : n.link;
+        let target = n.link;
+        if (n.type === 'GOAL' || target.startsWith('/goal') || target.startsWith('/goals')) {
+          target = '/goal';
+        }
         router.push(target);
       }
     } catch (err) {
