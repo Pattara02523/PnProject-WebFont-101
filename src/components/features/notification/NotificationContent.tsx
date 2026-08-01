@@ -57,7 +57,8 @@ export default function NotificationContent() {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
       }
       if (n.link) {
-        router.push(n.link);
+        let target = n.link.startsWith('/goals') ? n.link.replace('/goals', '/goal') : n.link;
+        router.push(target);
       }
     } catch (err) {
       console.error('markRead failed:', err);
@@ -292,9 +293,16 @@ export default function NotificationContent() {
                           </p>
 
                           {n.link && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-2 hover:underline">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markRead(n);
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-2 hover:underline cursor-pointer"
+                            >
                               ดูรายละเอียด <ExternalLink className="size-3" />
-                            </span>
+                            </button>
                           )}
                         </div>
 
