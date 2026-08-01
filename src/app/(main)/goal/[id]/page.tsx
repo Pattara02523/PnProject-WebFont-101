@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Target, Calendar, Loader2, AlertCircle } from 'lucide-react';
-import { Card, Button, Badge } from '@/components/ui';
+import { Card, Badge } from '@/components/ui';
 import { GoalApi, Goal } from '@/lib/api/goal.api';
 
-export default function GoalDetailPage({ params }: { params: { id: string } }) {
+export default function GoalDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  const resolvedParams = use(Promise.resolve(params));
+  const id = resolvedParams.id;
+
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +19,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
       try {
         setLoading(true);
         setError(null);
-        const data = await GoalApi.findOne(params.id);
+        const data = await GoalApi.findOne(id);
         setGoal(data);
       } catch (err: any) {
         setError(err?.message ?? 'ไม่สามารถดึงข้อมูลเป้าหมายได้');
@@ -25,10 +28,10 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
       }
     }
 
-    if (params.id) {
+    if (id) {
       loadGoal();
     }
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return (

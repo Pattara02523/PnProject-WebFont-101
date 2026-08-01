@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Megaphone, Calendar, AlertCircle } from 'lucide-react';
 import { Card, Badge } from '@/components/ui';
 import { AnnouncementApi, Announcement } from '@/lib/api/admin.api';
 
-export default function AnnouncementDetailPage({ params }: { params: { id: string } }) {
+export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  const resolvedParams = use(Promise.resolve(params));
+  const id = resolvedParams.id;
+
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +19,7 @@ export default function AnnouncementDetailPage({ params }: { params: { id: strin
       try {
         setLoading(true);
         setError(null);
-        const data = await AnnouncementApi.findOne(params.id);
+        const data = await AnnouncementApi.findOne(id);
         setAnnouncement(data);
       } catch (err: any) {
         setError(err?.message ?? 'ไม่สามารถดึงข้อมูลประกาศได้');
@@ -25,10 +28,10 @@ export default function AnnouncementDetailPage({ params }: { params: { id: strin
       }
     }
 
-    if (params.id) {
+    if (id) {
       loadAnnouncement();
     }
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return (
