@@ -153,7 +153,7 @@ export const UserApi = {
     return apiFetch<AdminUser>('/users/profile', { method: 'GET' });
   },
 
-  async updateProfile(dto: { firstname?: string; lastname?: string; phone?: string }): Promise<AdminUser> {
+  async updateProfile(dto: { firstname?: string; lastname?: string; phone?: string; avatarUrl?: string }): Promise<AdminUser> {
     return apiFetch<AdminUser>('/users/profile', { method: 'PATCH', body: dto });
   },
 

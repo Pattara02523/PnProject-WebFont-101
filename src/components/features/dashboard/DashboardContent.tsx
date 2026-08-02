@@ -15,6 +15,7 @@ import { useAuth } from '@/components/providers/AuthContext';
 import { PortfolioApi } from '@/lib/api/portfolio.api';
 import { InvestmentApi } from '@/lib/api/investment.api';
 import { GoalApi } from '@/lib/api/goal.api';
+import { UserApi } from '@/lib/api/admin.api';
 import {
   TrendingUp,
   TrendingDown,
@@ -98,13 +99,24 @@ export default function DashboardContent() {
   const dGoalsCount = goals.length;
   const completedGoalsCount = goals.filter((g) => g.status === 'COMPLETED').length;
 
-  const userInitials = user
-    ? `${user.firstname?.[0] ?? ''}${user.lastname?.[0] ?? ''}`.toUpperCase() || 'U'
+  // Fetch user profile
+  const { data: userProfile } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: () => UserApi.getProfile(),
+    retry: false,
+  });
+
+  const avatarUrl = userProfile?.avatarUrl || user?.avatarUrl;
+  const firstname = userProfile?.firstname || user?.firstname;
+  const lastname = userProfile?.lastname || user?.lastname;
+
+  const userInitials = (firstname?.[0] || lastname?.[0])
+    ? `${firstname?.[0] ?? ''}${lastname?.[0] ?? ''}`.toUpperCase()
     : 'U';
 
-  const userFullName = user
-    ? `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim() || user.email
-    : 'ผู้ใช้งาน';
+  const userFullName = (firstname || lastname)
+    ? `${firstname ?? ''} ${lastname ?? ''}`.trim()
+    : (user?.email || 'ผู้ใช้งาน');
 
   // Dynamic Portfolio Growth timeline (past 6 months)
   const portfolioGrowthData = useMemo(() => {
@@ -175,8 +187,12 @@ export default function DashboardContent() {
         <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
           {/* Left: User Welcome info */}
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-            <div className="size-16 rounded-full border-2 border-white/20 bg-white/15 backdrop-blur-sm grid place-items-center text-2xl font-bold font-sans">
-              {userInitials}
+            <div className="size-16 rounded-full border-2 border-white/20 bg-white/15 backdrop-blur-sm grid place-items-center text-2xl font-bold font-sans overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                userInitials
+              )}
             </div>
             <div>
               <div className="flex items-center justify-center sm:justify-start gap-2">

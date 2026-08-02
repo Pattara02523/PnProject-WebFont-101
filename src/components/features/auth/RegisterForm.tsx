@@ -59,7 +59,7 @@ export function RegisterForm() {
         firstname: data.firstname,
         lastname: data.lastname,
         email: data.email,
-        phone: data.phone,
+        phone: data.phone?.trim() ? data.phone.trim() : undefined,
         password: data.password,
       });
     } catch (err: any) {

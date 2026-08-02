@@ -21,6 +21,8 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { UserApi } from '@/lib/api/admin.api';
 import NavigationItem from './NavigationItem';
 
 const SIDEBAR_ITEMS = [
@@ -40,15 +42,25 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  const initials = user
-    ? `${user.firstname?.[0] ?? ''}${user.lastname?.[0] ?? ''}`.toUpperCase() || 'U'
+  const { data: userProfile } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: () => UserApi.getProfile(),
+    retry: false,
+  });
+
+  const avatarUrl = userProfile?.avatarUrl || user?.avatarUrl;
+  const firstname = userProfile?.firstname || user?.firstname;
+  const lastname = userProfile?.lastname || user?.lastname;
+
+  const initials = (firstname?.[0] || lastname?.[0])
+    ? `${firstname?.[0] ?? ''}${lastname?.[0] ?? ''}`.toUpperCase()
     : 'U';
 
-  const fullName = user
-    ? `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim() || user.email
-    : 'ผู้ใช้งาน';
+  const fullName = (firstname || lastname)
+    ? `${firstname ?? ''} ${lastname ?? ''}`.trim()
+    : (user?.email || 'ผู้ใช้งาน');
 
-  const email = user?.email ?? '';
+  const email = userProfile?.email || user?.email || '';
 
   return (
     <aside
@@ -141,8 +153,12 @@ export default function Sidebar() {
         {/* User Card - only when expanded */}
         {!collapsed && (
           <div className="flex items-center gap-3 p-1 select-none">
-            <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10 shrink-0">
-              {initials}
+            <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10 shrink-0 overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="text-left overflow-hidden">
               <h4 className="text-sm font-bold text-foreground truncate">
@@ -158,8 +174,12 @@ export default function Sidebar() {
         {/* Collapsed: show avatar only */}
         {collapsed && (
           <div className="flex justify-center">
-            <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10">
-              {initials}
+            <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold grid place-items-center text-sm border border-emerald-500/10 overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+              ) : (
+                initials
+              )}
             </div>
           </div>
         )}

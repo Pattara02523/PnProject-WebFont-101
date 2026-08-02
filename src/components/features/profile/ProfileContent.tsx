@@ -17,6 +17,7 @@ import { Card, Button, Input, Badge, ConfirmDialog } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserApi } from '@/lib/api/admin.api';
+import { AvatarUploader } from './AvatarUploader';
 
 export default function ProfileContent() {
   const router = useRouter();
@@ -116,30 +117,25 @@ export default function ProfileContent() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sidebar */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-4">
           <Card className="p-4">
-            {/* Avatar */}
-            <div className="flex flex-col items-center gap-3 mb-5 pb-5 border-b border-slate-100 dark:border-slate-800">
-              <div className="relative">
-                {profile?.avatarUrl ? (
-                  <img
-                    src={profile.avatarUrl}
-                    alt="avatar"
-                    className="w-16 h-16 rounded-full object-cover ring-2 ring-white dark:ring-slate-900 shadow"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-linear-to-br from-emerald-400 to-teal-500 flex items-center justify-center ring-2 ring-white dark:ring-slate-900 shadow text-white text-xl font-bold">
-                    {initials}
-                  </div>
-                )}
-                <button className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shadow">
-                  <Camera className="w-3.5 h-3.5 text-white" />
-                </button>
-              </div>
-              <div className="text-center">
+            {/* Avatar Uploader */}
+            <div className="mb-5 pb-5 border-b border-slate-100 dark:border-slate-800">
+              <AvatarUploader
+                currentAvatarUrl={profile?.avatarUrl}
+                onAvatarUploaded={async (url) => {
+                  try {
+                    await UserApi.updateProfile({ avatarUrl: url });
+                    queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+                  } catch (err) {
+                    console.error('Failed to update avatar URL in user profile:', err);
+                  }
+                }}
+              />
+              <div className="text-center mt-3">
                 <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {form.firstname} {form.lastname}
                 </p>
@@ -174,7 +170,7 @@ export default function ProfileContent() {
         </div>
 
         {/* Content */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-8">
           {section === 'info' && (
             <Card className="p-6">
               <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-5">
