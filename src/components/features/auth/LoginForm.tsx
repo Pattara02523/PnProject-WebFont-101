@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 35 / Flow ขั้นตอนที่ 35]
+ * ชื่อไฟล์: LoginForm.tsx
+ * หน้าที่หลัก: Component ฟอร์มเข้าสู่ระบบ (Login Form) รับ email/password แล้วเรียก `authApi.login()`
+ * รับอะไรมาจากไหน (Input): User Input Form (email, password)
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): ส่งข้อมูลให้ AuthContext และ Redirect ไปยัง `/dashboard`
+ * ==========================================
+ */
+
 'use client';
 
 import { useState } from 'react';
@@ -159,22 +169,6 @@ export function LoginForm() {
               {errors.password && (
                 <p className="text-xs text-destructive">{errors.password.message}</p>
               )}
-            </div>
-
-            <div className="flex items-center justify-between gap-4 text-sm">
-              <label className="flex items-center gap-2 text-muted-foreground">
-                <input
-                  className="size-4 rounded border bg-card accent-primary"
-                  type="checkbox"
-                />
-                <span>จดจำไว้</span>
-              </label>
-              <Link
-                className="font-medium text-primary hover:underline"
-                href="/forgot-password"
-              >
-                ลืมรหัสผ่าน?
-              </Link>
             </div>
 
             <Button

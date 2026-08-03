@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 09 / Flow ขั้นตอนที่ 9]
+ * ชื่อไฟล์: auth.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับบริการระบบพิสูจน์ตัวตน (Login, Register, Get Profile/Me)
+ * รับอะไรมาจากไหน (Input): Credentials (LoginDto, RegisterDto) จาก Auth Forms
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` และคืนค่า Token/User Profile ให้ AuthContext
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 // ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────

@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 41 / Flow ขั้นตอนที่ 41]
+ * ชื่อไฟล์: DashboardContent.tsx
+ * หน้าที่หลัก: Component แสดงหน้าภาพรวม Dashboard (Cards มูลค่ารวมพอร์ต, ROI %, กราฟ Asset Allocation, สรุปเป้าหมาย และ ธุรกรรมล่าสุด)
+ * รับอะไรมาจากไหน (Input): ข้อมูลจาก `dashboardApi.getDashboard()` ผ่าน React Query
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render หน้า Dashboard สรุปภาพรวมทางการเงิน
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useMemo } from 'react';

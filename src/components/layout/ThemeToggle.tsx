@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 28 / Flow ขั้นตอนที่ 28]
+ * ชื่อไฟล์: ThemeToggle.tsx
+ * หน้าที่หลัก: Component สวิตช์สลับธีม Light Mode / Dark Mode
+ * รับอะไรมาจากไหน (Input): User Click Event
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): อัปเดต class `dark` ที่ document.documentElement และบันทึกใน LocalStorage
+ * ==========================================
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';

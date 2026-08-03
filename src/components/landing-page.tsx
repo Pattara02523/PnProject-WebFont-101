@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 34 / Flow ขั้นตอนที่ 34]
+ * ชื่อไฟล์: landing-page.tsx
+ * หน้าที่หลัก: Component แสดงรายละเอียดหน้า Landing Page (Hero section, Features overview, Call to Action ไปยัง Login/Register)
+ * รับอะไรมาจากไหน (Input): User Interactions
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render หน้าต้อนรับสวยงามพร้อมปุ่มเริ่มต้นใช้งาน
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useState, useEffect } from 'react';

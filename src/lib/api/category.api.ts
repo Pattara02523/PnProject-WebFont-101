@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 13 / Flow ขั้นตอนที่ 13]
+ * ชื่อไฟล์: category.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับจัดการหมวดหมู่สินทรัพย์ (Create, Update, Delete, List)
+ * รับอะไรมาจากไหน (Input): Category DTOs และ Category ID
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` สื่อสารกับ `/categories/*`
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 // ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────

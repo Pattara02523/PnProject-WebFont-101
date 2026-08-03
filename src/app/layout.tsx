@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 25 / Flow ขั้นตอนที่ 25]
+ * ชื่อไฟล์: layout.tsx
+ * หน้าที่หลัก: Root Layout หลักของแอปพลิเคชัน ห่อหุ้มด้วย HTML Structure, Custom Fonts, QueryProvider และ AuthProvider
+ * รับอะไรมาจากไหน (Input): children React Nodes
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render โครงสร้างหน้าเว็บพื้นฐานของทุก Route
+ * ==========================================
+ */
+
 import '@/styles/globals.css';
 
 import { cn } from '@/lib/utils';

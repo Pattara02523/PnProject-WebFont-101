@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 31 / Flow ขั้นตอนที่ 31]
+ * ชื่อไฟล์: Sidebar.tsx
+ * หน้าที่หลัก: Component แถบเมนูข้างหลัก (Main Navigation Sidebar) สำหรับ User ทั่วไป (Dashboard, Portfolios, Investments, Transactions, Goals, Reports ฯลฯ)
+ * รับอะไรมาจากไหน (Input): Current Pathname, Auth State
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render แถบ Sidebar ข้างซ้าย
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useState } from 'react';

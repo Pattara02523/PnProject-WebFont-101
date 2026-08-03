@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 61 / Flow ขั้นตอนที่ 61]
+ * ชื่อไฟล์: ReportsContent.tsx
+ * หน้าที่หลัก: Component ฟอร์มเลือกช่วงเวลาและรูปแบบรายงานเพื่อดาวน์โหลดสรุปพอร์ตการเงิน (PDF / CSV)
+ * รับอะไรมาจากไหน (Input): Form Inputs (startDate, endDate, format)
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียก `reportApi.downloadReport()` และดาวน์โหลดไฟล์
+ * ==========================================
+ */
+
 "use client";
 
 import { useState } from 'react';

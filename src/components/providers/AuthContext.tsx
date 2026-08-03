@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 23 / Flow ขั้นตอนที่ 23]
+ * ชื่อไฟล์: AuthContext.tsx
+ * หน้าที่หลัก: React Context Provider สำหรับจัดการ Global Auth State (user, isAuthenticated, isLoading, login, logout, refreshToken)
+ * รับอะไรมาจากไหน (Input): auth_token จาก js-cookie
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): กระจายข้อมูลสถานะผู้ใช้งาน ให้ทุกส่วนของเว็บเรียกใช้ผ่าน `useAuth()`
+ * ==========================================
+ */
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';

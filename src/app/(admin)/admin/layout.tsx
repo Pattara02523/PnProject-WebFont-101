@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 72 / Flow ขั้นตอนที่ 72]
+ * ชื่อไฟล์: layout.tsx
+ * หน้าที่หลัก: Layout สำหรับผู้ดูแลระบบ ครอบด้วย `<AdminGuard />` และ `<AdminSidebar />`
+ * รับอะไรมาจากไหน (Input): children React Nodes
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render โครงสร้างแผงควบคุม Admin
+ * ==========================================
+ */
+
 import React from 'react';
 import AdminSidebar from '@/components/layout/AdminSidebar';
 import Header from '@/components/layout/Header';

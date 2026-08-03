@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 19 / Flow ขั้นตอนที่ 19]
+ * ชื่อไฟล์: notification.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับรายการแจ้งเตือนในแอป (List Notifications, Mark as Read, Delete)
+ * รับอะไรมาจากไหน (Input): Notification ID
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` สื่อสารกับ `/notifications/*`
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 // ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────

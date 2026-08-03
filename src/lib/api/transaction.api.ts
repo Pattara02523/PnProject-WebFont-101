@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 15 / Flow ขั้นตอนที่ 15]
+ * ชื่อไฟล์: transaction.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับจัดการรายการธุรกรรมการเงิน ซื้อ/ขาย/ปันผล/ฝาก/ถอน
+ * รับอะไรมาจากไหน (Input): Transaction DTOs, Query Filters และ Transaction ID
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` สื่อสารกับ `/transactions/*`
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 // ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────

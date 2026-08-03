@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 26 / Flow ขั้นตอนที่ 26]
+ * ชื่อไฟล์: button.tsx
+ * หน้าที่หลัก: Reusable Base UI Component: ปุ่มกด (Button) รองรับ variants, sizes และ loading states
+ * รับอะไรมาจากไหน (Input): ButtonProps, onClick, variant, size
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render ป้ายกดสไตล์สวยงามพร้อม Tailwind CSS
+ * ==========================================
+ */
+
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 

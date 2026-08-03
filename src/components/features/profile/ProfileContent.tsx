@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 64 / Flow ขั้นตอนที่ 64]
+ * ชื่อไฟล์: ProfileContent.tsx
+ * หน้าที่หลัก: Component ฟอร์มแก้ไขข้อมูลส่วนตัว ชื่อ เบอร์โทร รูปโปรไฟล์ และเปลี่ยนรหัสผ่าน
+ * รับอะไรมาจากไหน (Input): User Profile Context & Form Inputs
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียก `userApi.updateProfile()` / `changePassword()`
+ * ==========================================
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';

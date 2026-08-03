@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 14 / Flow ขั้นตอนที่ 14]
+ * ชื่อไฟล์: investment.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับจัดการสินทรัพย์การลงทุน (Create, Update, Delete, List, Get Detail)
+ * รับอะไรมาจากไหน (Input): Investment DTOs, Query Filters และ Investment ID
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` สื่อสารกับ `/investments/*`
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 // ─── Types ตรงตาม Backend Prisma Schema ─────────────────────────────

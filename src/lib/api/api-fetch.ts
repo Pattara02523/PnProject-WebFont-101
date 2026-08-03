@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 08 / Flow ขั้นตอนที่ 8]
+ * ชื่อไฟล์: api-fetch.ts
+ * หน้าที่หลัก: Core HTTP Fetch Wrapper สำหรับยิง HTTP Request ไปยัง NestJS Backend API (จัดการ Token จาก Cookie, Header Authorization: Bearer, JSON Serialization)
+ * รับอะไรมาจากไหน (Input): Endpoint Path, Fetch Options, JWT Token จาก Cookie `auth_token`
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): คืนค่าผลลัพธ์ Data Response หรือโยน `ApiError` ให้แก่ API Service Modules
+ * ==========================================
+ */
+
 import { ApiError } from './api-error';
 
 export type ApiFetchOptions = Omit<RequestInit, 'body'> & {

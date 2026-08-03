@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 40 / Flow ขั้นตอนที่ 40]
+ * ชื่อไฟล์: layout.tsx
+ * หน้าที่หลัก: Main Protected Layout ครอบหน้าแอปพลิเคชันหลัก ด้วย `<Sidebar />` และ `<Header />`
+ * รับอะไรมาจากไหน (Input): children React Nodes
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render โครงสร้างหน้า Dashboard/Portfolios ฯลฯ
+ * ==========================================
+ */
+
 import React from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';

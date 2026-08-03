@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 77 / Flow ขั้นตอนที่ 77]
+ * ชื่อไฟล์: AdminActivityLogsContent.tsx
+ * หน้าที่หลัก: Component แสดงประวัติกิจกรรมการใช้งานระบบ Audit Logs (Activity Logs)
+ * รับอะไรมาจากไหน (Input): ข้อมูลจาก `adminApi.getActivityLogs()`
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render ตาราง Audit Logs ของระบบ
+ * ==========================================
+ */
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';

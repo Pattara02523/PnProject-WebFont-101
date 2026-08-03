@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 32 / Flow ขั้นตอนที่ 32]
+ * ชื่อไฟล์: AdminSidebar.tsx
+ * หน้าที่หลัก: Component แถบเมนูข้างสำหรับผู้ดูแลระบบ (Admin Sidebar Panel: Overview, Users, Activity Logs, Announcements, Reports)
+ * รับอะไรมาจากไหน (Input): Current Pathname, Admin Auth State
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render แถบ Sidebar ฝั่งผู้ดูแลระบบ
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useState } from 'react';

@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 63 / Flow ขั้นตอนที่ 63]
+ * ชื่อไฟล์: AvatarUploader.tsx
+ * หน้าที่หลัก: Component อัปโหลดและแสดงพรีวิวรูปภาพโปรไฟล์ผ่าน Cloudinary API
+ * รับอะไรมาจากไหน (Input): Selected Image File
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): ส่ง URL รูปภาพโปรไฟล์ใหม่ให้ Profile Form
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useRef, useState } from 'react';

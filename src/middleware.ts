@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 24 / Flow ขั้นตอนที่ 24]
+ * ชื่อไฟล์: middleware.ts
+ * หน้าที่หลัก: Next.js Server Middleware สำหรับสกัดกั้นการเข้าถึง Route (Protected Routes, Auth Routes, Admin Routes) ตาม Cookie Token
+ * รับอะไรมาจากไหน (Input): NextRequest (Cookies, Url Path)
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): อนุญาตให้เข้าหน้า หรือ Redirect ไปยัง `/login` / `/dashboard` / `/admin`
+ * ==========================================
+ */
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 

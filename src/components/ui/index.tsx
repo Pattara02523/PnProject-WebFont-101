@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 27 / Flow ขั้นตอนที่ 27]
+ * ชื่อไฟล์: index.tsx
+ * หน้าที่หลัก: Index File รวมการ Export อุปกรณ์ UI Components พื้นฐาน (Card, Input, Modal, Badge, Table, Spinner ฯลฯ)
+ * รับอะไรมาจากไหน (Input): UI Components
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): ส่งออก UI components ให้ Feature Components นำไปใช้ง่ายขึ้น
+ * ==========================================
+ */
+
 'use client';
 
 import { type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'

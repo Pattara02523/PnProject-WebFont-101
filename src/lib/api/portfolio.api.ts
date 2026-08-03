@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 12 / Flow ขั้นตอนที่ 12]
+ * ชื่อไฟล์: portfolio.api.ts
+ * หน้าที่หลัก: API Client Module สำหรับจัดการพอร์ตการลงทุน (Create, Update, Delete, List, Get Detail)
+ * รับอะไรมาจากไหน (Input): Portfolio DTOs และ Portfolio ID
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): เรียกใช้ `apiFetch` สื่อสารกับ `/portfolios/*`
+ * ==========================================
+ */
+
 import { apiFetch } from './api-fetch';
 
 export type Portfolio = {

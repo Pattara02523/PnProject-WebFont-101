@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 73 / Flow ขั้นตอนที่ 73]
+ * ชื่อไฟล์: AdminDashboardContent.tsx
+ * หน้าที่หลัก: Component ภาพรวมแผงควบคุม Admin (จำนวนผู้ใช้ระบบ, Active Users, สถิติพอร์ต และ Activity Logs ล่าสุด)
+ * รับอะไรมาจากไหน (Input): ข้อมูลจาก `adminApi.getDashboard()`
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render สถิติผู้ดูแลระบบ
+ * ==========================================
+ */
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';

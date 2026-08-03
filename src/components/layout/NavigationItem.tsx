@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 29 / Flow ขั้นตอนที่ 29]
+ * ชื่อไฟล์: NavigationItem.tsx
+ * หน้าที่หลัก: Component เมนูแถบข้าง (Sidebar Item) แสดงไอคอน ข้อความ และสถานะ Active State ตาม URL
+ * รับอะไรมาจากไหน (Input): href, label, icon, isActive
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): Render เมนูกดเปลี่ยนหน้าพร้อม Highlight สวยงาม
+ * ==========================================
+ */
+
 import React from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';

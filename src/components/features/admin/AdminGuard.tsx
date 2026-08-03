@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 71 / Flow ขั้นตอนที่ 71]
+ * ชื่อไฟล์: AdminGuard.tsx
+ * หน้าที่หลัก: Component ป้องกันการเข้าถึงฝั่ง Admin (ตรวจสอบว่า user.role === 'ADMIN' หรือไม่)
+ * รับอะไรมาจากไหน (Input): Auth Context Role Data
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): อนุญาตให้ Render Admin Page หรือ Redirect ไปยัง `/dashboard`
+ * ==========================================
+ */
+
 'use client';
 
 import React, { useEffect } from 'react';

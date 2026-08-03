@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 37 / Flow ขั้นตอนที่ 37]
+ * ชื่อไฟล์: RegisterForm.tsx
+ * หน้าที่หลัก: Component ฟอร์มสมัครสมาชิก (Register Form) รับข้อมูลชื่อ อีเมล รหัสผ่าน แล้วเรียก `authApi.register()`
+ * รับอะไรมาจากไหน (Input): User Input Form (firstname, lastname, email, password)
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): สมัครสมาชิกสำเร็จแล้วนำผู้ใช้ไปยังหน้า Login
+ * ==========================================
+ */
+
 'use client';
 
 import { useState } from 'react';

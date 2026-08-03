@@ -1,3 +1,13 @@
+/**
+ * ==========================================
+ * ลำดับการทำงาน: [ลำดับที่ 03 / Flow ขั้นตอนที่ 3]
+ * ชื่อไฟล์: globals.css
+ * หน้าที่หลัก: ไฟล์สไตล์ระดับ Global ของแอปพลิเคชัน กำหนด Tailwind Directives, CSS Color Variables (Light/Dark Mode Theme) และ Custom Utilities
+ * รับอะไรมาจากไหน (Input): CSS Directives และ Root Variables
+ * ส่งอะไรไปที่ไหนต่อ (Output / Target): นำเข้าใน `src/app/layout.tsx` เพื่อตกแต่งสไตล์ทุกหน้าในแอปพลิเคชัน
+ * ==========================================
+ */
+
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
